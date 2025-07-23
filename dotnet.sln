@@ -1,0 +1,35 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "src/Crawlers", "src\Crawlers\Crawlers.csproj", "{0E1B4F17-357D-0D67-1C21-FDFAE9A58C53}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{C8FB2EC3-08B0-418E-8DAD-3D1714219145}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Crawlers.Tests", "tests\Crawlers.Tests\Crawlers.Tests.csproj", "{347CF198-1F4E-473A-A976-2391E6B467BD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0E1B4F17-357D-0D67-1C21-FDFAE9A58C53}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0E1B4F17-357D-0D67-1C21-FDFAE9A58C53}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0E1B4F17-357D-0D67-1C21-FDFAE9A58C53}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0E1B4F17-357D-0D67-1C21-FDFAE9A58C53}.Release|Any CPU.Build.0 = Release|Any CPU
+		{347CF198-1F4E-473A-A976-2391E6B467BD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{347CF198-1F4E-473A-A976-2391E6B467BD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{347CF198-1F4E-473A-A976-2391E6B467BD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{347CF198-1F4E-473A-A976-2391E6B467BD}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {97A62DFD-96AE-4269-962A-053BA11AC492}
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{347CF198-1F4E-473A-A976-2391E6B467BD} = {C8FB2EC3-08B0-418E-8DAD-3D1714219145}
+	EndGlobalSection
+EndGlobal

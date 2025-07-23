@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SimSage Crawler (console)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/bin/Debug/net8.0/Crawlers.dll",
+      "args": [
+        "/debug",
+        "-crawler", "file",
+        "-server", "https://test7.simsage.ai/api",
+        "-org", "0197e48f-be19-541f-59d5-fe44613836a8",
+        "-kb", "0197e490-5781-bab6-5347-279d6704eec4",
+        "-sid", "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+        "-source", "1"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole",
+      "stopAtEntry": false,
+      "justMyCode": true
+    },
+    {
+      "name": ".NET Core Attach",
+      "type": "coreclr",
+      "request": "attach"
+    }
+  ]
+}
