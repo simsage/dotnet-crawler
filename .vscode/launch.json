@@ -6,15 +6,16 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/bin/Debug/net8.0/Crawlers.dll",
+      "program": "${workspaceFolder}/src/Crawlers/bin/Debug/net8.0/Crawlers.dll",
       "args": [
         "/debug",
         "-crawler", "file",
-        "-server", "https://test7.simsage.ai/api",
-        "-org", "0197e48f-be19-541f-59d5-fe44613836a8",
-        "-kb", "0197e490-5781-bab6-5347-279d6704eec4",
-        "-sid", "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-        "-source", "1"
+        "-server", "https://youserver.simsage.ai/api",
+        "-org", "c276f883-e0c8-43ae-9119-df8b7df9c574",
+        "-kb", "46ff0c75-7938-492c-ab50-442496f5de51",
+        "-sid", "",
+        "-source", "1",
+        "-aes", ""
       ],
       "cwd": "${workspaceFolder}",
       "console": "internalConsole",

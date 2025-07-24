@@ -2,36 +2,11 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build-x32",
+      "label": "build",
       "command": "dotnet",
       "type": "process",
       "args": [
-        "build",
-        "${workspaceFolder}/dotnet.sln",
-        "--no-incremental",
-        "--arch", "x86",
-        "/property:GenerateFullPaths=false",
-        "/consoleloggerparameters:NoSummary"
-      ],
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "detail": "Generates the executable for the project."
-    },
-    {
-      "label": "build-release-x32",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/dotnet.sln",
-        "--no-incremental",
-        "--configuration Release",
-        "--arch", "x86",
-        "/property:GenerateFullPaths=false",
-        "/consoleloggerparameters:NoSummary"
+        "build"
       ],
       "problemMatcher": "$msCompile",
       "group": {
@@ -41,33 +16,13 @@
       "detail": "Generates the executable for the project."
     },
     {
-      "label": "build-release-x64",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/dotnet.sln",
-        "--no-incremental",
-        "--configuration Release",
-        "/property:GenerateFullPaths=false",
-        "/consoleloggerparameters:NoSummary"
-      ],
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "detail": "Generates the executable for the project."
-    },
-    {
-      "label": "publish-x32",
+      "label": "publish",
       "command": "dotnet",
       "type": "process",
       "args": [
         "publish",
         "${workspaceFolder}/dotnet.sln",
         "/property:GenerateFullPaths=true",
-        "--arch", "x86",
         "/consoleloggerparameters:NoSummary"
       ],
       "problemMatcher": "$msCompile"
@@ -81,7 +36,6 @@
         "run",
         "${workspaceFolder}/dotnet.sln",
         "/property:GenerateFullPaths=true",
-        "--arch", "x86",
         "/consoleloggerparameters:NoSummary"
       ],
       "problemMatcher": "$msCompile"
