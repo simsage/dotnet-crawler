@@ -64,15 +64,3 @@ public abstract class CrawlerUtils
     public static double CrawlerWaitTimeInHours(string currentTimeIndicator, string schedule, bool notRunning) => 0.0; // Placeholder
     public static string GetCurrentTimeIndicatorString() => DateTime.Now.Hour.ToString(); // Placeholder
 }
-
-// Placeholder for Sha512 - needs actual implementation
-public abstract class Sha512
-{
-    public static string GenerateSha512Hash(string input) => input; // Placeholder
-}
-
-// Placeholder for SharedSecrets - needs actual implementation
-public abstract class SharedSecrets
-{
-    public static Guid GetRandomGuid(int seed) => Guid.NewGuid(); // Placeholder
-}

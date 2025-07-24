@@ -26,6 +26,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private readonly string organisationId;
     private readonly string kbId;
     private readonly string sid;
+    private static string _aes;
     private readonly int sourceId;
     private readonly bool useEncryption;
     private readonly bool exitAfterFinishing;
@@ -62,6 +63,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         string organisationId,
         string kbId,
         string sid,
+        string aes,
         int sourceId,
         bool useEncryption,
         bool exitAfterFinishing,
@@ -74,6 +76,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         this.organisationId = organisationId;
         this.kbId = kbId;
         this.sid = sid;
+        _aes = aes;
         this.sourceId = sourceId;
         this.useEncryption = useEncryption;
         this.exitAfterFinishing = exitAfterFinishing;
@@ -986,7 +989,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
             var payload = Mapper.WriteValueAsString(sendMap);
             if (useEncryption)
             {
-                encryptionKey = Sha512.GenerateSha512Hash(SharedSecrets.GetRandomGuid(seed).ToString());
+                encryptionKey = Sha512.GenerateSha512Hash(_aes, SharedSecrets.GetRandomGuid(_aes, seed).ToString());
                 var encryptedBody = AesEncryption.Encrypt(payload, encryptionKey);
                 if (Verbose)
                     Logger.Info($"POST encrypted body {encryptedBody.Length} bytes");
@@ -1022,7 +1025,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         {
             return AesEncryption.Decrypt(
                 str,
-                Sha512.GenerateSha512Hash(SharedSecrets.GetRandomGuid(seed).ToString())
+                Sha512.GenerateSha512Hash(_aes, SharedSecrets.GetRandomGuid(_aes, seed).ToString())
             );
         }
         return str;

@@ -58,6 +58,7 @@ namespace Crawlers;
                     startParameters.OrganisationId, 
                     startParameters.KbId, 
                     startParameters.Sid, 
+                    startParameters.Aes,
                     startParameters.SourceId, 
                     startParameters.UseEncryption, 
                     startParameters.ExitAfterFinishing, 
