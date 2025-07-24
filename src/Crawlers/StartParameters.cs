@@ -109,11 +109,6 @@ public class StartParameters
             return false;
         }
 
-        if (UseEncryption)
-        {
-            Console.WriteLine("Error: -encryption (message encryption) is currently not supported in dotnet.");
-            return false;
-        }
         return true;
     }
 
