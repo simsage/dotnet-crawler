@@ -60,7 +60,7 @@ using System.ServiceProcess;
                 Console.WriteLine("No special command-line arguments provided. To run in console mode, use /console or /debug.");
                 Console.WriteLine("To install, use /install. To uninstall, use /uninstall.");
                 Console.WriteLine("Press any key to exit.");
-                Console.ReadKey();
+                Console.Read();
             }
             else
             {
