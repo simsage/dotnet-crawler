@@ -3,7 +3,7 @@ namespace Crawlers.Tests;
 public class TestSharedSecrets
 {
     // AES key
-    private const string OldAesKey = "199b7b02-4acb-4746-8399-50a72acfe124";
+    private const string OldAesKey = "345251e3-c7ef-4d71-8afd-84b89345f148";
 
     [Fact]
     public void TestSharedSecrets1()
@@ -12,7 +12,7 @@ public class TestSharedSecrets
         var n1 = SharedSecrets.GetRandomGuid(OldAesKey, 0);
         Assert.Equal(n0, n1);
         // with the old AES key, offset 0 MUST generate this guid
-        Assert.Equal("07a68590-a4e9-0244-3b34-4c8a56beb325", n1.ToString());
+        Assert.Equal("2dd2fa10-0850-328b-3900-5065d1ad807c", n1.ToString());
     }
 
     [Fact]
@@ -22,7 +22,7 @@ public class TestSharedSecrets
         var n1 = SharedSecrets.GetRandomGuid(OldAesKey, -100);
         Assert.Equal(n0, n1);
         // with the old AES key, offset 0 MUST generate this guid
-        Assert.Equal("e2a997b3-7f2b-d401-63c1-644ed2e39064", n1.ToString());
+        Assert.Equal("432fb103-ea7c-332c-8b52-46b51a129aa1", n1.ToString());
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public class TestSharedSecrets
         var n1 = SharedSecrets.GetRandomGuid(OldAesKey, Int32.MinValue);
         Assert.Equal(n0, n1);
         // with the old AES key, offset 0 MUST generate this guid
-        Assert.Equal("07a68590-a4e9-0244-3b34-4c8a56beb325", n1.ToString());
+        Assert.Equal("2dd2fa10-0850-328b-3900-5065d1ad807c", n1.ToString());
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public class TestSharedSecrets
         var n1 = SharedSecrets.GetRandomGuid(OldAesKey, Int32.MaxValue);
         Assert.Equal(n0, n1);
         // with the old AES key, offset 0 MUST generate this guid
-        Assert.Equal("4e3654e7-c341-c78d-eebc-75eacea4a4d3", n1.ToString());
+        Assert.Equal("7390bf87-95b9-9a9c-d000-e4e230329e94", n1.ToString());
     }
 
     

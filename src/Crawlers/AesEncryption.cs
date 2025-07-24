@@ -23,14 +23,14 @@ namespace Crawlers
         {
             if (DataAesKey.Length == 0)
                 throw new InvalidOperationException("AES Key is not set");
-            return Encrypt(plainText, DecodeHexString(DataAesKey));
+            return Encrypt(plainText, DataAesKey);
         }
 
         public string Decrypt(string plainText)
         {
             if (DataAesKey.Length == 0)
                 throw new InvalidOperationException("AES Key is not set");
-            return Decrypt(plainText, DecodeHexString(DataAesKey));
+            return Decrypt(plainText, DataAesKey);
         }
 
         /// <summary>

@@ -14,6 +14,7 @@ public static class Sha512
     /// <summary>
     /// Generates a proper SHA512 hash with a salt and pepper.
     /// </summary>
+    /// <param name="aes">The AES system key</param>
     /// <param name="password">The input string to hash.</param>
     /// <returns>A 128-character lowercase SHA512 hex string.</returns>
     public static string GenerateSha512Hash(string aes, string password)
