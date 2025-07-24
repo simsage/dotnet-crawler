@@ -164,7 +164,7 @@ using System.Linq;
             }
             catch (Exception ex)
             {
-                Logger.Error($"Set() {ex.Message}");
+                Logger.Error($"Set() {ex.Message} {ex.InnerException}");
             }
         }
 
