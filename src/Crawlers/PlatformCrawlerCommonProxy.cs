@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Diagnostics;
+using Newtonsoft.Json;
 
 public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 {
@@ -26,7 +27,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private readonly string organisationId;
     private readonly string kbId;
     private readonly string sid;
-    private static string _aes;
+    private static string? _aes;
     private readonly int sourceId;
     private readonly bool useEncryption;
     private readonly bool exitAfterFinishing;
@@ -77,6 +78,8 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         this.kbId = kbId;
         this.sid = sid;
         _aes = aes;
+        if (_aes == null)
+            throw new ArgumentException("AES value cannot be null");
         this.sourceId = sourceId;
         this.useEncryption = useEncryption;
         this.exitAfterFinishing = exitAfterFinishing;
