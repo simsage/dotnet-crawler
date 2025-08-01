@@ -89,7 +89,7 @@ namespace Crawlers;
                     {
                         crawler.Initialize(InternalServiceName, source.GetCrawlerPropertyMap(), platform);
                         platform.CrawlerStart(crawler);
-                        if (crawler.Run())
+                        if (platform.WaitForStart() && crawler.Run())
                         {
                             platform.CrawlerDone();
                             EventLog.WriteEntry(InternalServiceName, $"{source}: done", EventLogEntryType.Information);

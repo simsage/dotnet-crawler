@@ -654,6 +654,49 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         running = true;
     }
 
+
+    /// <summary>
+    /// Is the system ready for the initial start
+    /// This function will _wait_ until we're ready to start
+    /// </summary>
+    /// <returns><c>true</c> after we're ready to go, false if the crawler needs to stop / exit</returns>
+    public bool WaitForStart()
+    {
+        if (source == null) return false;
+
+        var currentSchedule = source?.Schedule ?? "";
+        var currentScheduleEnabled = source?.ScheduleEnable ?? false;
+        var waitTimeInHours = CrawlerUtils.CrawlerWaitTimeInHours(
+            CrawlerUtils.GetCurrentTimeIndicatorString(),
+            source?.Schedule ?? "",
+            !running
+        );
+        var waitTimeInMilliseconds = (long)(waitTimeInHours * 3600_000L);
+        if (waitTimeInMilliseconds > 0)
+        {
+            var prevTime = RockUtils.MilliSecondsDeltaToString(waitTimeInMilliseconds);
+            var waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTimeInMilliseconds;
+            while (Active && waitTime > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            {
+                // wait 10 seconds before checking the source again
+                for (var i = 0; i < 10 && Active; i++)
+                {
+                    Thread.Sleep(1_000); // wait 10 seconds before checking again
+
+                }
+                if (!Active) break;
+                // get any source changes
+                CheckCrawler();
+                if (currentSchedule != (source?.Schedule ?? ""))
+                    return false; // terminate crawler: schedule changed
+                if (currentScheduleEnabled != (source?.ScheduleEnable ?? false))
+                    return false; // terminate crawler: schedule enabled status changed
+            }
+        }
+        return Active;
+    }
+
+
     /// <summary>
     /// Is the system ready for a crawl?
     /// This function will _wait_ until we're ready
@@ -677,7 +720,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
             for (var i = 0; i < 10 && Active; i++)
             {
                 Thread.Sleep(1_000); // wait 10 seconds before checking again
-                
+
             }
 
             if (!Active) break;
