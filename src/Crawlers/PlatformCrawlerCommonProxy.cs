@@ -686,7 +686,6 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                 for (var i = 0; i < 10 && Active; i++)
                 {
                     Thread.Sleep(1_000); // wait 10 seconds before checking again
-
                 }
                 if (!Active) break;
                 // get any source changes
