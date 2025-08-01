@@ -679,6 +679,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         {
             var prevTime = RockUtils.MilliSecondsDeltaToString(waitTimeInMilliseconds);
             var waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTimeInMilliseconds;
+            Logger.Info($"{source?.Name}: waiting {prevTime} as per schedule");
             while (Active && waitTime > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
             {
                 // wait 10 seconds before checking the source again
