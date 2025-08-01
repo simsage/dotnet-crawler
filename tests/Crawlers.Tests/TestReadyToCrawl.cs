@@ -14,6 +14,7 @@ public class TestReadyToCrawl
             timeSet.Add(time);
             time = CrawlerUtils.GetNextTimeSlot(time);
             Assert.Equal(6, time.Length);
+            i += 1;
         }
         Assert.Equal(24 * 7, timeSet.Count);
     }
