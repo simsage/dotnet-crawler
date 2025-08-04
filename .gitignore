@@ -2,3 +2,5 @@ obj/
 bin/
 dotnet.sln.DotSettings.user
 .idea/
+logs/
+
