@@ -439,6 +439,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     public void MarkFileAsSeen(Asset asset)
     {
         CheckCrawler();
+        asset.Filename = ""; // files already seen do not send data
         var cleanAsset = EncodeAsset(asset);
         Logger.Debug($"markFileAsSeen(url={cleanAsset.Url})");
         var seed = rng.Next();
