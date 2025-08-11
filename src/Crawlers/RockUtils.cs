@@ -19,13 +19,13 @@ public abstract class RockUtils
 
     
     /// <summary>
-    /// Not necessary for Windows C#
+    /// Not necessary for Windows C#, all text is stored as UTF-16
     /// </summary>
     /// <param name="text"></param>
     /// <returns></returns>
     public static string Windows1252ToUtf8(string text)
     {
-        return Utf8.GetString(Utf8.GetBytes(text));
+        return text;
     }
 
     
