@@ -1,7 +1,5 @@
 namespace Crawlers;
 
-// Placeholder for DocumentAcl - needs actual implementation
-
 using System;
 using System.Text.Json.Serialization;
 

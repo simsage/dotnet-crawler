@@ -32,12 +32,12 @@ public class AccessControlEntry
     public bool IsInherited { get; set; }
 
     /// <summary>
-    /// Placeholder for user's email address. Requires Active Directory lookup.
+    /// user's email address. Requires Active Directory lookup.
     /// </summary>
     public string Email { get; set; } = "";
 
     /// <summary>
-    /// Placeholder for group members. Requires Active Directory lookup.
+    /// group members. Requires Active Directory lookup.
     /// </summary>
     public List<string> GroupMemberships { get; set; } = [];
 }

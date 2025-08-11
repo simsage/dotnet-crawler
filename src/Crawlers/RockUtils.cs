@@ -1,20 +1,29 @@
+using System.Text;
+
 namespace Crawlers;
 
 public abstract class RockUtils
 {
+    private static readonly Encoding Utf8 = Encoding.UTF8;
+    
     /// <summary>
     /// Determines whether the current application is running on a Windows operating system.
     /// </summary>
     /// <returns><c>true</c> if the application is running on a Windows operating system; otherwise, <c>false</c>.</returns>
     public static bool IsWindows() => System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
+
     
     /// <summary>
     /// Not necessary for Windows C#
     /// </summary>
     /// <param name="text"></param>
     /// <returns></returns>
-    public static string Windows1252ToUtf8(string text) => text; // Placeholder for encoding conversion
+    public static string Windows1252ToUtf8(string text)
+    {
+        return Utf8.GetString(Utf8.GetBytes(text));
+    }
 
+    
     /// <summary>
     /// Converts a time duration in milliseconds to a human-readable string representation.
     /// </summary>

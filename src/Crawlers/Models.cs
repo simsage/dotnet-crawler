@@ -4,8 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-// For System.Text.Json's JsonIgnore
-
 public abstract class RenameFolderAsset
 {
     [JsonPropertyName("originalFolderName")]
@@ -15,15 +13,6 @@ public abstract class RenameFolderAsset
 
     [JsonPropertyName("assetAclList")] 
     public List<AssetAcl> AssetAclList { get; set; } = [];
-
-    public RenameFolderAsset() { }
-    
-    public RenameFolderAsset(string originalFolderName, string newFolderName, List<AssetAcl> assetACLList)
-    {
-        OriginalFolderName = originalFolderName;
-        NewFolderName = newFolderName;
-        AssetAclList = assetACLList;
-    }
 }
 
 public class MetadataMapping
@@ -43,22 +32,22 @@ public class MetadataMapping
     }
 }
 
-// Placeholder for JsonSerializer - needs actual implementation (e.g., using Newtonsoft.Json)
+// JsonSerializer
 public class JsonSerializer
 {
-    public static JsonSerializer Create() => new JsonSerializer();
+    public static JsonSerializer Create() => new();
     public string WriteValueAsString(object obj) => System.Text.Json.JsonSerializer.Serialize(obj);
     public T? ReadValue<T>(string json) => System.Text.Json.JsonSerializer.Deserialize<T>(json);
 }
 
 
-// Placeholder for Vars - needs actual implementation
+// Vars - read data from the environment settings
 public class Vars
 {
     public static string Get(string key) => Environment.GetEnvironmentVariable(key) ?? "";
 }
 
-// Placeholder for CrawlerUtils - needs actual implementation
+// CrawlerUtils - help the crawler with various functions
 public abstract class CrawlerUtils
 {
     /// <summary>
@@ -122,13 +111,12 @@ public abstract class CrawlerUtils
             if (dow == "wed") return "thu-00";
             if (dow == "thu") return "fri-00";
             if (dow == "fri") return "sat-00";
-            if (dow == "sat") return "sun-00";
             return "sun-00";
         }
         var nextHod = hodInt + 1;
         if (nextHod < 10)
-            return dow + "-0" + nextHod.ToString();
-        return dow + "-" + nextHod.ToString();
+            return dow + "-0" + nextHod;
+        return dow + "-" + nextHod;
     }
 
 
