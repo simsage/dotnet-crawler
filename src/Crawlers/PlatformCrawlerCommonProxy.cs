@@ -8,8 +8,11 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Diagnostics;
-using Newtonsoft.Json;
 
+/// <summary>
+/// the main communications bus with the external SimSage system to transfer files and data
+/// called and used by the crawlers
+/// </summary>
 public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 {
     private static readonly bool Verbose = Vars.Get("external_crawler_verbose").ToLowerInvariant() == "true";
@@ -18,43 +21,43 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
     private const string NotLoaded = "source not loaded (null)";
     private const string Base64Prefix = ";base64,";
-    private readonly bool isWindows = RockUtils.IsWindows();
-    private readonly int cacheLifespanInDays = 30;
+    private readonly bool _isWindows = RockUtils.IsWindows();
+    private const int CacheLifespanInDays = 30;
     public bool Active { get; set; } = true;
 
-    private readonly string simSageEndpoint;
-    private readonly string simSageApiVersion;
-    private readonly string organisationId;
-    private readonly string kbId;
-    private readonly string sid;
+    private readonly string _simSageEndpoint;
+    private readonly string _simSageApiVersion;
+    private readonly string _organisationId;
+    private readonly string _kbId;
+    private readonly string _sid;
     private static string? _aes;
-    private readonly int sourceId;
-    private readonly bool useEncryption;
-    private readonly bool exitAfterFinishing;
-    private readonly bool allowSelfSignedCertificate;
-    private readonly string crawlerType;
+    private readonly int _sourceId;
+    private readonly bool _useEncryption;
+    private readonly bool _exitAfterFinishing;
+    private readonly bool _allowSelfSignedCertificate;
+    private readonly string _crawlerType;
 
     // for generating random numbers for picking shared keys
-    private readonly Random rng = new Random();
+    private readonly Random _rng = new Random();
 
     // how many files we've uploaded thus far
-    private int numFilesUploaded;
-    private long numFilesSeen;
-    private int numErrors;
+    private int _numFilesUploaded;
+    private long _numFilesSeen;
+    private int _numErrors;
 
     // is the crawler running?
-    private bool running;
+    private bool _running;
 
     // access to the crawler
-    private Source? source;
-    private long sourceNextRefreshTime;
+    private Source? _source;
+    private long _sourceNextRefreshTime;
     private const long SourceRefreshInterval = 120_000L; // 2L * 60_000L // every 2 minutes
     
     // crawler cache
     private readonly SqliteAssetDao? _cacheDao;
 
     // the run id
-    private long runId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    private long _runId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     public PlatformCrawlerCommonProxy(
         string serviceName,
@@ -72,19 +75,19 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         bool useCache
     )
     {
-        this.simSageEndpoint = simSageEndpoint;
-        this.simSageApiVersion = simSageApiVersion;
-        this.organisationId = organisationId;
-        this.kbId = kbId;
-        this.sid = sid;
+        _simSageEndpoint = simSageEndpoint;
+        _simSageApiVersion = simSageApiVersion;
+        _organisationId = organisationId;
+        _kbId = kbId;
+        _sid = sid;
         _aes = aes;
         if (_aes == null)
             throw new ArgumentException("AES value cannot be null");
-        this.sourceId = sourceId;
-        this.useEncryption = useEncryption;
-        this.exitAfterFinishing = exitAfterFinishing;
-        this.allowSelfSignedCertificate = allowSelfSignedCertificate;
-        this.crawlerType = crawlerType;
+        _sourceId = sourceId;
+        _useEncryption = useEncryption;
+        _exitAfterFinishing = exitAfterFinishing;
+        _allowSelfSignedCertificate = allowSelfSignedCertificate;
+        _crawlerType = crawlerType;
 
         // set up mime-types in the system
         FileUtils.ReadMimeTypeInformation();
@@ -102,8 +105,8 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// </summary>
     public Source GetSource()
     {
-        source ??= GetCrawlerFromDb();
-        return source ?? throw new ArgumentException(NotLoaded);
+        _source ??= GetCrawlerFromDb();
+        return _source ?? throw new ArgumentException(NotLoaded);
     }
 
     /// <summary>
@@ -115,44 +118,44 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private Source GetCrawlerFromDb()
     {
         Logger.Debug("getCrawlerFromDb()");
-        var seed = rng.Next();
-        var url = !useEncryption
-            ? $"{simSageEndpoint}/crawler/external/crawler"
-            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var seed = _rng.Next();
+        var url = !_useEncryption
+            ? $"{_simSageEndpoint}/crawler/external/crawler"
+            : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
 
         var jsonStr = HttpPost(
             url,
             [
                 "objectType", "CMExternalCrawler",
-                "organisationId", organisationId,
-                "kbId", kbId,
-                "sid", sid,
-                "sourceId", sourceId
+                "organisationId", _organisationId,
+                "kbId", _kbId,
+                "sid", _sid,
+                "sourceId", _sourceId
             ],
-            useEncryption,
+            _useEncryption,
             seed,
-            simSageApiVersion,
-            allowSelfSignedCertificate
+            _simSageApiVersion,
+            _allowSelfSignedCertificate
         );
         var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
         CheckError(data);
 
         // update the interval for checking the source
-        sourceNextRefreshTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + SourceRefreshInterval;
+        _sourceNextRefreshTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + SourceRefreshInterval;
 
-        source = Mapper.ReadValue<Source>(jsonStr);
+        _source = Mapper.ReadValue<Source>(jsonStr);
 
         // set up the external source logger according to transmitExternalLogs
-        if (source != null)
+        if (_source != null)
         {
-            if (source.CrawlerType != crawlerType)
+            if (_source.CrawlerType != _crawlerType)
             {
-                throw new ArgumentException($"Source type incorrect, expected \"{crawlerType}\" but got \"{source.CrawlerType}\"");
+                throw new ArgumentException($"Source type incorrect, expected \"{_crawlerType}\" but got \"{_source.CrawlerType}\"");
             }
-            RockLogger.SetUpExternalSourceLogger(source.TransmitExternalLogs ? this : null);
+            RockLogger.SetUpExternalSourceLogger(_source.TransmitExternalLogs ? this : null);
         }
 
-        return source ?? throw new ArgumentException("crawler json-mapped to null");
+        return _source ?? throw new ArgumentException("crawler json-mapped to null");
     }
 
     /// <summary>
@@ -160,10 +163,10 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// </summary>
     public bool HasExceededCapacity()
     {
-        var sourceMaxItems = source?.MaxItems ?? 0;
-        if (sourceMaxItems > 0 && numFilesUploaded >= sourceMaxItems)
+        var sourceMaxItems = _source?.MaxItems ?? 0;
+        if (sourceMaxItems > 0 && _numFilesUploaded >= sourceMaxItems)
         {
-            Logger.Debug($"crawler \"{source?.Name ?? ""}\" has exceeded maximum-capacity of {sourceMaxItems}, stopping crawl");
+            Logger.Debug($"crawler \"{_source?.Name ?? ""}\" has exceeded maximum-capacity of {sourceMaxItems}, stopping crawl");
             return true;
         }
         return false;
@@ -172,9 +175,9 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     // is this an inventory-only asset?
     public bool IsInventoryOnly(string mimeType)
     {
-        if (source == null)
+        if (_source == null)
             throw new ArgumentException("source is null");
-        return source.IsInventoryOnly(mimeType);
+        return _source.IsInventoryOnly(mimeType);
     }
 
     /// <summary>
@@ -200,22 +203,22 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// <param name="logEntry">the log entry to send</param>
     public void TransmitLogEntryToPlatform(string logEntry)
     {
-        var seed = rng.Next();
-        var url = !useEncryption
-            ? $"{simSageEndpoint}/crawler/external/crawler/log"
-            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var seed = _rng.Next();
+        var url = !_useEncryption
+            ? $"{_simSageEndpoint}/crawler/external/crawler/log"
+            : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
 
         try
         {
             HttpPost(
                 url, [
                     "objectType", "CMExternalLogEntry",
-                    "organisationId", organisationId,
-                    "kbId", kbId,
-                    "sid", sid,
-                    "sourceId", sourceId,
+                    "organisationId", _organisationId,
+                    "kbId", _kbId,
+                    "sid", _sid,
+                    "sourceId", _sourceId,
                     "logEntry", logEntry
-                ], useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+                ], _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
             );
         }
         catch (Exception ex)
@@ -230,7 +233,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// </summary>
     private void AdjustCrawlRate()
     {
-        var s = source;
+        var s = _source;
         if (s is { FilesPerSecond: > 1.0f })
         {
             Thread.Sleep((int)s.FilesPerSecond);
@@ -253,41 +256,41 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         string deltaRootId
     )
     {
-        var cleanUrl = isWindows ? RockUtils.Windows1252ToUtf8(url) : url;
-        var cleanException = isWindows ? RockUtils.Windows1252ToUtf8(exception) : exception;
+        var cleanUrl = _isWindows ? RockUtils.Windows1252ToUtf8(url) : url;
+        var cleanException = _isWindows ? RockUtils.Windows1252ToUtf8(exception) : exception;
 
         // cleanWebUrl can be empty!
-        var cleanWebUrl = isWindows ? RockUtils.Windows1252ToUtf8(webUrl) : webUrl;
+        var cleanWebUrl = _isWindows ? RockUtils.Windows1252ToUtf8(webUrl) : webUrl;
 
         // check parameters before posting
-        if (string.IsNullOrWhiteSpace(cleanUrl) || string.IsNullOrWhiteSpace(kbId) ||
-            string.IsNullOrWhiteSpace(organisationId) || sourceId <= 0 || string.IsNullOrWhiteSpace(sid) || runId == 0L
+        if (string.IsNullOrWhiteSpace(cleanUrl) || string.IsNullOrWhiteSpace(_kbId) ||
+            string.IsNullOrWhiteSpace(_organisationId) || _sourceId <= 0 || string.IsNullOrWhiteSpace(_sid) || _runId == 0L
         )
         {
             throw new ArgumentException("invalid parameter(s)");
         }
 
-        numFilesSeen += 1;
+        _numFilesSeen += 1;
         Logger.Debug($"recordExceptionAsset(url={cleanUrl},exception={cleanException},webUrl={cleanWebUrl})");
-        var seed = rng.Next();
-        var postUrl = !useEncryption
-            ? $"{simSageEndpoint}/crawler/external/document/recordfailure"
-            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var seed = _rng.Next();
+        var postUrl = !_useEncryption
+            ? $"{_simSageEndpoint}/crawler/external/document/recordfailure"
+            : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
         try
         {
             var jsonStr = HttpPost(
                 postUrl, [
                     "objectType", "CMFailedSourceDocument",
-                    "organisationId", organisationId,
-                    "kbId", kbId,
-                    "sid", sid,
-                    "sourceId", sourceId,
+                    "organisationId", _organisationId,
+                    "kbId", _kbId,
+                    "sid", _sid,
+                    "sourceId", _sourceId,
                     "sourceSystemId", cleanUrl,
                     "webUrl", cleanWebUrl,
                     "deltaRootId", deltaRootId,
-                    "runId", runId,
+                    "runId", _runId,
                     "errorMessage", cleanException
-                ], useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+                ], _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
             );
             var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
             CheckError(data);
@@ -308,7 +311,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// </summary>
     private void CheckCrawler()
     {
-        if (sourceNextRefreshTime < DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+        if (_sourceNextRefreshTime < DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
         {
             GetCrawlerFromDb();
         }
@@ -319,12 +322,12 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// </summary>
     public void SetDeltaState(string deltaIndicator)
     {
-        var cleanDelta = isWindows ? RockUtils.Windows1252ToUtf8(deltaIndicator) : deltaIndicator;
+        var cleanDelta = _isWindows ? RockUtils.Windows1252ToUtf8(deltaIndicator) : deltaIndicator;
         Logger.Debug($"setDeltaState({cleanDelta})");
-        var seed = rng.Next();
-        var url = !useEncryption
-            ? $"{simSageEndpoint}/crawler/external/crawler/delta-token"
-            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var seed = _rng.Next();
+        var url = !_useEncryption
+            ? $"{_simSageEndpoint}/crawler/external/crawler/delta-token"
+            : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
 
         try
         {
@@ -332,15 +335,15 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                 url,
                 [
                     "objectType", "CMExternalCrawlerSetDeltaToken",
-                    "organisationId", organisationId,
-                    "kbId", kbId, "sid", sid, "sourceId", sourceId,
+                    "organisationId", _organisationId,
+                    "kbId", _kbId, "sid", _sid, "sourceId", _sourceId,
                     "deltaToken", cleanDelta
                 ],
-                useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+                _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
             );
             var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
-            if (source != null)
-                source.DeltaIndicator = deltaIndicator;
+            if (_source != null)
+                _source.DeltaIndicator = deltaIndicator;
             CheckError(data);
         }
         catch (ArgumentException)
@@ -353,7 +356,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         }
     }
 
-    public string GetDeltaState() => source?.DeltaIndicator ?? "";
+    public string GetDeltaState() => _source?.DeltaIndicator ?? "";
 
 
     /// <summary>
@@ -364,7 +367,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     public bool ProcessAsset(Asset externalAsset)
     {
         // upload - valid or invalid (i.e. data/mime-type or no mime-type - all valid
-        numFilesUploaded += 1;
+        _numFilesUploaded += 1;
 
         // make sure the asset doesn't contain any bad windows characters
         var encodedAsset = EncodeAsset(externalAsset);
@@ -400,32 +403,32 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                 return true;
             }
             // set the item's data in cache
-            _cacheDao.Set(externalAsset.Url, assetHash, cacheLifespanInDays * 3600_000L * 24L);
+            _cacheDao.Set(externalAsset.Url, assetHash, CacheLifespanInDays * 3600_000L * 24L);
         }
 
         // is this an inventory-only asset?  don't send the bytes
-        if (source?.IsInventoryOnly(externalAsset.MimeType) == true)
+        if (_source?.IsInventoryOnly(externalAsset.MimeType) == true)
         {
             externalAsset.RemoveAssetTempFile();
         }
 
-        var seed = (int)rng.NextInt64();
+        var seed = (int)_rng.NextInt64();
 
         // upload this file
         try {
-            numFilesSeen += 1;
+            _numFilesSeen += 1;
 
             FileUploadPost(
-                organisationId, kbId, sid, sourceId,
+                _organisationId, _kbId, _sid, _sourceId,
                 UploadExternalDocumentCmd.Convert(encodedAsset), externalAsset.Filename,
-                useEncryption, runId, seed, simSageEndpoint, simSageApiVersion,
+                _useEncryption, _runId, seed, _simSageEndpoint, _simSageApiVersion,
                 FileUtils.MaximumSizeInBytesForMimeType(externalAsset.MimeType),
-                allowSelfSignedCertificate
+                _allowSelfSignedCertificate
             );
 
         } catch (Exception ex) {
             Logger.Error($"processAsset({encodedAsset.Url}): {ex.Message}");
-            numErrors += 1;
+            _numErrors += 1;
             return false;
         }
         return true;
@@ -442,25 +445,25 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         asset.Filename = ""; // files already seen do not send data
         var cleanAsset = EncodeAsset(asset);
         Logger.Debug($"markFileAsSeen(url={cleanAsset.Url})");
-        var seed = rng.Next();
-        var postUrl = !useEncryption
-            ? $"{simSageEndpoint}/crawler/external/crawler/mark-file-as-seen"
-            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var seed = _rng.Next();
+        var postUrl = !_useEncryption
+            ? $"{_simSageEndpoint}/crawler/external/crawler/mark-file-as-seen"
+            : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
         try
         {
             var jsonStr = HttpPost(
                 postUrl, [
                     "objectType", "CMExternalCrawlerMarkFileAsSeen",
-                    "organisationId", organisationId,
-                    "kbId", kbId, "sid", sid, "sourceId", sourceId,
-                    "runId", runId,
+                    "organisationId", _organisationId,
+                    "kbId", _kbId, "sid", _sid, "sourceId", _sourceId,
+                    "runId", _runId,
                     "asset", cleanAsset
                 ],
-                useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+                _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
             );
             var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
             CheckError(data);
-            numFilesSeen += 1;
+            _numFilesSeen += 1;
         }
         catch (ArgumentException)
         {
@@ -474,23 +477,23 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
     public bool Delete(string url)
     {
-        var cleanUrl = isWindows ? RockUtils.Windows1252ToUtf8(url) : url;
+        var cleanUrl = _isWindows ? RockUtils.Windows1252ToUtf8(url) : url;
         Logger.Debug($"delete({cleanUrl})");
-        var seed = rng.Next();
-        var postUrl = !useEncryption
-            ? $"{simSageEndpoint}/crawler/external/crawler/delete-url"
-            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var seed = _rng.Next();
+        var postUrl = !_useEncryption
+            ? $"{_simSageEndpoint}/crawler/external/crawler/delete-url"
+            : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
 
         try
         {
             var jsonStr = HttpPost(
                 postUrl, [
                     "objectType", "CMExternalCrawlerDeleteUrl",
-                    "organisationId", organisationId,
-                    "kbId", kbId, "sid", sid, "sourceId", sourceId,
+                    "organisationId", _organisationId,
+                    "kbId", _kbId, "sid", _sid, "sourceId", _sourceId,
                     "url", cleanUrl
                 ],
-                useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+                _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
             );
             var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
             CheckError(data);
@@ -509,23 +512,23 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
     public void DeleteFolder(string folderUrl)
     {
-        var cleanFolderUrl = isWindows ? RockUtils.Windows1252ToUtf8(folderUrl) : folderUrl;
+        var cleanFolderUrl = _isWindows ? RockUtils.Windows1252ToUtf8(folderUrl) : folderUrl;
         Logger.Debug($"deleteFolder({cleanFolderUrl})");
-        var seed = rng.Next();
-        var postUrl = !useEncryption
-            ? $"{simSageEndpoint}/crawler/external/crawler/delete-folder"
-            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var seed = _rng.Next();
+        var postUrl = !_useEncryption
+            ? $"{_simSageEndpoint}/crawler/external/crawler/delete-folder"
+            : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
 
         try
         {
             var jsonStr = HttpPost(
                 postUrl, [
                     "objectType", "CMExternalCrawlerDeleteFolder",
-                    "organisationId", organisationId,
-                    "kbId", kbId, "sid", sid, "sourceId", sourceId,
+                    "organisationId", _organisationId,
+                    "kbId", _kbId, "sid", _sid, "sourceId", _sourceId,
                     "folderUrl", cleanFolderUrl
                 ],
-                useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+                _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
             );
             var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
             CheckError(data);
@@ -545,23 +548,23 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         Logger.Debug($"renameFolders(numFolders={changedFolders.Count})");
         foreach (var folder in changedFolders)
         {
-            var seed = rng.Next();
-            var postUrl = !useEncryption
-                ? $"{simSageEndpoint}/crawler/external/crawler/rename-folder"
-                : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+            var seed = _rng.Next();
+            var postUrl = !_useEncryption
+                ? $"{_simSageEndpoint}/crawler/external/crawler/rename-folder"
+                : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
 
             try
             {
                 var jsonStr = HttpPost(
                     postUrl, [
                         "objectType", "CMExternalCrawlerRenameFolder",
-                        "organisationId", organisationId,
-                        "kbId", kbId, "sid", sid, "sourceId", sourceId,
-                        "oldFolderNameUrl", isWindows ? RockUtils.Windows1252ToUtf8(folder.OriginalFolderName) : folder.OriginalFolderName,
-                        "newFolderNameUrl", isWindows ? RockUtils.Windows1252ToUtf8(folder.NewFolderName) : folder.NewFolderName,
+                        "organisationId", _organisationId,
+                        "kbId", _kbId, "sid", _sid, "sourceId", _sourceId,
+                        "oldFolderNameUrl", _isWindows ? RockUtils.Windows1252ToUtf8(folder.OriginalFolderName) : folder.OriginalFolderName,
+                        "newFolderNameUrl", _isWindows ? RockUtils.Windows1252ToUtf8(folder.NewFolderName) : folder.NewFolderName,
                         "acls", EncodeAclList(folder.AssetAclList)
                     ],
-                    useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+                    _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
                 );
                 var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
                 CheckError(data);
@@ -594,22 +597,22 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         CheckCrawler(); // also check any source changes just in case
         var cleanAsset = EncodeAsset(asset);
         Logger.Debug($"markFileAsSeen(url={cleanAsset.Url})");
-        var seed = rng.Next();
-        var postUrl = !useEncryption
-            ? $"{simSageEndpoint}/crawler/external/crawler/mark-file-as-seen"
-            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var seed = _rng.Next();
+        var postUrl = !_useEncryption
+            ? $"{_simSageEndpoint}/crawler/external/crawler/mark-file-as-seen"
+            : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
 
         try
         {
             var jsonStr = HttpPost(
                 postUrl, [
                     "objectType", "CMExternalCrawlerMarkFileAsSeen",
-                    "organisationId", organisationId,
-                    "kbId", kbId, "sid", sid, "sourceId", sourceId,
-                    "runId", runId,
+                    "organisationId", _organisationId,
+                    "kbId", _kbId, "sid", _sid, "sourceId", _sourceId,
+                    "runId", _runId,
                     "asset", cleanAsset
                 ],
-                useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+                _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
             );
             var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
             CheckError(data);
@@ -629,33 +632,33 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// </summary>
     public void CrawlerStart(ICrawler platformCrawler)
     {
-        if (source?.IsExternal == false)
+        if (_source?.IsExternal == false)
         {
-            running = false;
+            _running = false;
             return;
         }
         
         // cleanup cache
         _cacheDao?.CleanupExpiredEntries();
 
-        var crawler = source ?? throw new ArgumentException(NotLoaded);
+        var crawler = _source ?? throw new ArgumentException(NotLoaded);
 
         // check this crawler is a valid external crawler
         if (!crawler.IsExternal)
             throw new ArgumentException($"{crawler} is not set up as an external crawler");
 
         // set up a run-id
-        runId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        Logger.Info($"{crawler}, starting a new run for {runId}");
+        _runId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        Logger.Info($"{crawler}, starting a new run for {_runId}");
 
         // also signal the other pipe-lines that the crawler has started
         SignalCrawlerStart();
 
         // start crawling
-        numFilesSeen = 0;
-        numFilesUploaded = 0;
-        numErrors = 0;
-        running = true;
+        _numFilesSeen = 0;
+        _numFilesUploaded = 0;
+        _numErrors = 0;
+        _running = true;
     }
 
 
@@ -666,21 +669,21 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// <returns><c>true</c> after we're ready to go, false if the crawler needs to stop / exit</returns>
     public bool WaitForStart()
     {
-        if (source == null) return false;
+        if (_source == null) return false;
 
-        var currentSchedule = source?.Schedule ?? "";
-        var currentScheduleEnabled = source?.ScheduleEnable ?? false;
+        var currentSchedule = _source?.Schedule ?? "";
+        var currentScheduleEnabled = _source?.ScheduleEnable ?? false;
         var waitTimeInHours = CrawlerUtils.CrawlerWaitTimeInHours(
             CrawlerUtils.GetCurrentTimeIndicatorString(),
-            source?.Schedule ?? "",
-            !running
+            _source?.Schedule ?? "",
+            !_running
         );
-        var waitTimeInMilliseconds = (long)(waitTimeInHours * 3600_000L);
+        var waitTimeInMilliseconds = (waitTimeInHours * 3600_000L);
         if (waitTimeInMilliseconds > 0)
         {
             var prevTime = RockUtils.MilliSecondsDeltaToString(waitTimeInMilliseconds);
             var waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTimeInMilliseconds;
-            Logger.Info($"{source?.Name}: waiting {prevTime} as per schedule");
+            Logger.Info($"{_source?.Name}: waiting {prevTime} as per schedule");
             while (Active && waitTime > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
             {
                 // wait 10 seconds before checking the source again
@@ -691,9 +694,9 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                 if (!Active) break;
                 // get any source changes
                 CheckCrawler();
-                if (currentSchedule != (source?.Schedule ?? ""))
+                if (currentSchedule != (_source?.Schedule ?? ""))
                     return false; // terminate crawler: schedule changed
-                if (currentScheduleEnabled != (source?.ScheduleEnable ?? false))
+                if (currentScheduleEnabled != (_source?.ScheduleEnable ?? false))
                     return false; // terminate crawler: schedule enabled status changed
             }
         }
@@ -710,16 +713,16 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     {
         var waitTimeInHours = CrawlerUtils.CrawlerWaitTimeInHours(
             CrawlerUtils.GetCurrentTimeIndicatorString(),
-            source?.Schedule ?? "",
-            !running
+            _source?.Schedule ?? "",
+            !_running
         );
-        var waitTimeInMilliseconds = (long)(waitTimeInHours * 3600_000L);
+        var waitTimeInMilliseconds = (waitTimeInHours * 3600_000L);
         var waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTimeInMilliseconds;
-        if (!(waitTimeInHours > 0)) return running;
-        var currentSchedule = this.source?.Schedule ?? "";
+        if (!(waitTimeInHours > 0)) return _running;
+        var currentSchedule = _source?.Schedule ?? "";
         var prevTime = RockUtils.MilliSecondsDeltaToString(waitTimeInMilliseconds);
-        Logger.Info($"{source?.Name}: waiting {prevTime} as per schedule");
-        while (Active && waitTime > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() && source is { IsExternal: true })
+        Logger.Info($"{_source?.Name}: waiting {prevTime} as per schedule");
+        while (Active && waitTime > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() && _source is { IsExternal: true })
         {
             for (var i = 0; i < 10 && Active; i++)
             {
@@ -731,57 +734,57 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
             // get any source changes - if false - we need to re-evaluate our status
             CheckCrawler();
             // if the schedule changes, the crawler is no longer "finished"
-            if (source?.Schedule != currentSchedule)
+            if (_source?.Schedule != currentSchedule)
             {
-                currentSchedule = source?.Schedule ?? "";
-                if (!running)
+                currentSchedule = _source?.Schedule ?? "";
+                if (!_running)
                     SignalCrawlerStart();
-                running = true;
+                _running = true;
             }
             // abort if this is no longer an external crawler
-            if (source?.IsExternal == false)
+            if (_source?.IsExternal == false)
             {
-                running = false;
+                _running = false;
                 return false;
             }
             // re-evaluate our wait time - just in case
             waitTimeInHours = CrawlerUtils.CrawlerWaitTimeInHours(
                 CrawlerUtils.GetCurrentTimeIndicatorString(),
-                source?.Schedule ?? "",
-                !running
+                _source?.Schedule ?? "",
+                !_running
             );
-            waitTimeInMilliseconds = (long)(waitTimeInHours * 3600_000L);
+            waitTimeInMilliseconds = (waitTimeInHours * 3600_000L);
             waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTimeInMilliseconds;
             var nextTime = RockUtils.MilliSecondsDeltaToString(waitTimeInMilliseconds);
             if (prevTime != nextTime)
             {
                 prevTime = nextTime;
-                Logger.Info($"{source?.Name}: waiting {nextTime} as per schedule");
+                Logger.Info($"{_source?.Name}: waiting {nextTime} as per schedule");
             }
         }
-        return running;
+        return _running;
     }
 
     public void CrawlerDone()
     {
-        running = false;
+        _running = false;
 
-        if (numFilesSeen > 0)
+        if (_numFilesSeen > 0)
         {
-            Logger.Info($"{source?.Name}, finished runId {runId}");
+            Logger.Info($"{_source?.Name}, finished runId {_runId}");
             // signal the crawler has finished to the pipe-line
             CrawlerFinished();
         }
         else
         {
-            Logger.Warn($"crawler \"{source?.Name}\" didn't get any files, has finished run {runId}");
+            Logger.Warn($"crawler \"{_source?.Name}\" didn't get any files, has finished run {_runId}");
             // signal the crawler has finished to the pipe-line
             CrawlerFinished();
         }
 
-        if (exitAfterFinishing)
+        if (_exitAfterFinishing)
         {
-            Logger.Info($"crawler \"{source?.Name}\" exit after run finished (exit_after_crawl=true)");
+            Logger.Info($"crawler \"{_source?.Name}\" exit after run finished (exit_after_crawl=true)");
             FileUtils.Shutdown(exitCode: 0);
         }
 
@@ -790,19 +793,9 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
     public void CrawlerCrashed(string reason)
     {
-        running = false;
-        numFilesSeen = 0;
+        _running = false;
+        _numFilesSeen = 0;
         WaitUntilCrawlerReady();
-    }
-
-    public string GetCrawlerState()
-    {
-        return "";
-    }
-
-    public void SetCrawlerState(string state)
-    {
-        // Not implemented for this proxy
     }
 
     /// <summary>
@@ -811,18 +804,18 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private void SignalCrawlerStart()
     {
         Logger.Debug("signalCrawlerStart()");
-        var seed = rng.Next();
-        var url = !useEncryption
-            ? $"{simSageEndpoint}/crawler/external/crawler/start"
-            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var seed = _rng.Next();
+        var url = !_useEncryption
+            ? $"{_simSageEndpoint}/crawler/external/crawler/start"
+            : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
 
         try
         {
             var jsonStr = HttpPost(
                 url, [
-                    "objectType", "CMExternalCrawlerStart", "organisationId", organisationId,
-                    "kbId", kbId, "sid", sid, "sourceId", sourceId, "runId", runId
-                ], useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+                    "objectType", "CMExternalCrawlerStart", "organisationId", _organisationId,
+                    "kbId", _kbId, "sid", _sid, "sourceId", _sourceId, "runId", _runId
+                ], _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
             );
             var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
             CheckError(data);
@@ -843,21 +836,21 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private void CrawlerFinished()
     {
         // finished
-        Logger.Info($"{source}, has finished run {runId}");
+        Logger.Info($"{_source}, has finished run {_runId}");
 
-        var seed = rng.Next();
-        var url = !useEncryption
-            ? $"{simSageEndpoint}/crawler/external/crawler/finish"
-            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var seed = _rng.Next();
+        var url = !_useEncryption
+            ? $"{_simSageEndpoint}/crawler/external/crawler/finish"
+            : $"{_simSageEndpoint}/crawler/external/secure/{seed}";
 
         try
         {
             var jsonStr = HttpPost(
                 url, [
-                    "objectType", "CMExternalCrawlerStop", "organisationId", organisationId,
-                    "kbId", kbId, "sid", sid, "sourceId", sourceId, "numErrors", numErrors, "runId", runId,
-                    "numFilesSeen", numFilesSeen
-                ], useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+                    "objectType", "CMExternalCrawlerStop", "organisationId", _organisationId,
+                    "kbId", _kbId, "sid", _sid, "sourceId", _sourceId, "numErrors", _numErrors, "runId", _runId,
+                    "numFilesSeen", _numFilesSeen
+                ], _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
             );
             var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
             CheckError(data);
@@ -1149,7 +1142,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
     string ICrawlerApi.GetDeltaState()
     {
-        return source?.DeltaIndicator ?? "";
+        return _source?.DeltaIndicator ?? "";
     }
 
     
