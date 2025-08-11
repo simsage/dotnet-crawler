@@ -23,6 +23,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private const string Base64Prefix = ";base64,";
     private readonly bool _isWindows = RockUtils.IsWindows();
     private const int CacheLifespanInDays = 30;
+    private const int MaxUploadBlockSize = 1024 * 1024 * 10; // 10MB
     public bool Active { get; set; } = true;
 
     private readonly string _simSageEndpoint;
@@ -38,7 +39,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private readonly string _crawlerType;
 
     // for generating random numbers for picking shared keys
-    private readonly Random _rng = new Random();
+    private readonly Random _rng = new();
 
     // how many files we've uploaded thus far
     private int _numFilesUploaded;
@@ -420,7 +421,8 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
             FileUploadPost(
                 _organisationId, _kbId, _sid, _sourceId,
-                UploadExternalDocumentCmd.Convert(encodedAsset), externalAsset.Filename,
+                UploadExternalDocumentCmd.Convert(encodedAsset), 
+                externalAsset.Filename,
                 _useEncryption, _runId, seed, _simSageEndpoint, _simSageApiVersion,
                 FileUtils.MaximumSizeInBytesForMimeType(externalAsset.MimeType),
                 _allowSelfSignedCertificate
@@ -947,37 +949,44 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private static void FileUploadPost(
         string organisationId, string kbId, string sid, int sourceId,
         UploadExternalDocumentCmd file, string filename, bool useEncryption, long runId, int seed,
-        string simSageEndpoint, string simSageApiVersion, long maxSizeInBytes, bool allowSelfSignedCertificate
+        string simSageEndpoint, string simSageApiVersion, 
+        long maxSizeInBytes, bool allowSelfSignedCertificate
     )
     {
         var tempFile = !string.IsNullOrEmpty(filename) ? new FileInfo(filename) : null;
-        var data = tempFile?.Exists == true ? File.ReadAllBytes(filename) : [];
-        Logger.Debug($"fileUploadPost(url={file.Url},size={data.Length})");
+        var totalFileSize = tempFile?.Length ?? 0;
+        var jobId = Guid.NewGuid().ToString(); 
         try
         {
-            var url = !useEncryption
-                ? $"{simSageEndpoint}/crawler/external/document/upload"
-                : $"{simSageEndpoint}/crawler/external/secure/{seed}";
-            var base64Data = "";
-            // never post more data than we're supposed to
-            if (data.Length > 0 && data.Length < maxSizeInBytes)
+            if (tempFile?.Exists == true && totalFileSize > 0 && totalFileSize < maxSizeInBytes)
             {
-                base64Data = Base64Prefix + Convert.ToBase64String(data);
+                // split the data to send into blocks
+                var totalParts = (int)Math.Ceiling((double)totalFileSize / (double)MaxUploadBlockSize);
+                var buffer = new byte[MaxUploadBlockSize];
+                Logger.Debug($"fileUploadPost(url={file.Url},size={totalFileSize},blocks={totalParts},jobId={jobId})");
+                using var fileStream = new FileStream(filename, FileMode.Open, FileAccess.Read);
+                foreach (var partId in Enumerable.Range(0, totalParts))
+                {
+                    var dataSize = fileStream.Read(buffer, 0, buffer.Length);
+                    PartialUpload(
+                        organisationId, kbId, sid, sourceId,
+                        partId, totalParts, buffer, dataSize, jobId, totalFileSize,
+                        file, useEncryption, runId,
+                        seed, simSageEndpoint, simSageApiVersion, allowSelfSignedCertificate
+                    );
+                }
             }
-
-            var jsonStr = HttpPost(
-                url, [
-                    "objectType", "CMUploadDocument", "organisationId", organisationId, "kbId", kbId, "sid", sid,
-                    "sourceId", sourceId, "url", file.Url, "mimeType", file.MimeType, "runId", runId,
-                    "acls", AssetAcl.UniqueAcls(file.Acls), "title", file.Title, "author", file.Author,
-                    "changeHash", file.ChangeHash, "contentHash", file.ContentHash,
-                    "data", base64Data, "created", file.Created, "lastModified", file.LastModified,
-                    "size", file.Size, "metadata", file.Metadata, "categories", file.Categories, "puid", file.Puid,
-                    "template", file.Template, "binarySize", file.BinarySize
-                ], useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
-            );
-            var data2 = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
-            CheckError(data2);
+            else
+            {
+                // perform a partial upload without any data - because the data is bigger than allowed
+                Logger.Debug($"fileUploadPost(url={file.Url},size={totalFileSize},data=null)");
+                PartialUpload(
+                    organisationId, kbId, sid, sourceId,
+                    0, 1, null, 0, jobId, totalFileSize,
+                    file, useEncryption, runId,
+                    seed, simSageEndpoint, simSageApiVersion, allowSelfSignedCertificate
+                );
+            }
         }
         finally
         {
@@ -985,6 +994,73 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         }
     }
 
+
+    /// <summary>
+    /// helper - upload a file to SimSage, but in parts if necessary
+    /// </summary>
+    /// <param name="organisationId">the organisation</param>
+    /// <param name="kbId">the kb</param>
+    /// <param name="sid">the security id</param>
+    /// <param name="sourceId">the sourceId</param>
+    /// <param name="partId">the partId for the upload, starting at 0</param>
+    /// <param name="totalParts">the total parts to expect > 0</param>
+    /// <param name="data">the data to be send, can be null</param>
+    /// <param name="dataSize">the size of the data to be sent [0,dataSize]</param>
+    /// <param name="jobId">a random guid to identify this job</param>
+    /// <param name="totalFileSize">the total size of the file</param>
+    /// <param name="file">the file's details</param>
+    /// <param name="useEncryption">true to use message encryption (AES 256)</param>
+    /// <param name="runId">the run this file belongs to</param>
+    /// <param name="seed">the random seed for data encryption</param>
+    /// <param name="simSageEndpoint">the server to talk to</param>
+    /// <param name="simSageApiVersion">the API version of SimSage</param>
+    /// <param name="allowSelfSignedCertificate">lacks security for self signed certs</param>
+    private static void PartialUpload(
+        string organisationId, 
+        string kbId, 
+        string sid, 
+        int sourceId,
+        int partId, 
+        int totalParts, 
+        byte[]? data,
+        int dataSize,
+        string jobId,
+        long totalFileSize,
+        UploadExternalDocumentCmd file, 
+        bool useEncryption, 
+        long runId, 
+        int seed,
+        string simSageEndpoint, 
+        string simSageApiVersion, 
+        bool allowSelfSignedCertificate
+        )
+    {
+        var url = !useEncryption
+            ? $"{simSageEndpoint}/crawler/external/document/upload"
+            : $"{simSageEndpoint}/crawler/external/secure/{seed}";
+        var base64Data = "";
+        // never post more data than we're supposed to
+        if (data != null && dataSize is > 0 and <= MaxUploadBlockSize)
+        {
+            base64Data = Base64Prefix + Convert.ToBase64String(data[..dataSize]);
+        }
+        var jsonStr = HttpPost(
+            url, [
+                "objectType", "CMUploadDocument", "organisationId", organisationId, "kbId", kbId, "sid", sid,
+                "sourceId", sourceId, "url", file.Url, "mimeType", file.MimeType, "runId", runId,
+                "acls", AssetAcl.UniqueAcls(file.Acls), "title", file.Title, "author", file.Author,
+                "changeHash", file.ChangeHash, "contentHash", file.ContentHash,
+                "partId", partId, "totalParts", totalParts, "jobId", jobId, "totalFileSize", totalFileSize,
+                "data", base64Data, "created", file.Created, "lastModified", file.LastModified,
+                "size", file.Size, "metadata", file.Metadata, "categories", file.Categories, "puid", file.Puid,
+                "template", file.Template, "binarySize", file.BinarySize
+            ], useEncryption, seed, simSageApiVersion, allowSelfSignedCertificate
+        );
+        var data2 = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
+        CheckError(data2);
+    }
+
+    
     /// <summary>
     /// POST JSON data and return json result
     /// </summary>

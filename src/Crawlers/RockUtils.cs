@@ -4,13 +4,7 @@ namespace Crawlers;
 
 public abstract class RockUtils
 {
-    private static readonly Encoding Utf8 = Encoding.UTF8;
-
-    public static void RegisterEncodingProviders()
-    {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-    }
-    
+   
     /// <summary>
     /// Determines whether the current application is running on a Windows operating system.
     /// </summary>
