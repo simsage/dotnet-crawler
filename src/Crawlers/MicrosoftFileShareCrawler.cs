@@ -60,20 +60,13 @@ public class MicrosoftFileShareCrawler : ICrawler
 
         var parameters = GetParameters();
 
-        var newDelta = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
         // get AD information if set up
         var (users, groups) = SetupAdUsersAndGroups(parameters);
         _adUsers = users;
         _adGroups = groups;
 
-        // do it
-        if (!CrawlDirectory(_shareStartPath, 0))
-            return false;
-
-        _api?.SetDeltaState(newDelta.ToString());
-
-        return true;
+        // do it and return the exit status
+        return CrawlDirectory(_shareStartPath, 0);
     }
 
     public void SetDeltaState(string deltaState)
