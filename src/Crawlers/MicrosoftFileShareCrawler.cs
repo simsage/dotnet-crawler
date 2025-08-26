@@ -213,6 +213,9 @@ public class MicrosoftFileShareCrawler : ICrawler
     /// <param name="recursionDepth">starts at 0, how deep we are in the directory structure</param>
     private bool CrawlDirectory(string currentDirectory, int recursionDepth)
     {
+        if (recursionDepth > 100)
+            return true; // prevent infinite recursion
+        
         try
         {
             // Process files in the current directory
@@ -286,7 +289,11 @@ public class MicrosoftFileShareCrawler : ICrawler
             asset = ConvertToAsset(metadata);
             if (_api != null)
             {
-                return _api.ProcessAsset(asset);
+                if (_api.LastModifiedHasChanged(asset))
+                {
+                    asset.Filename = DownloadAssetData(metadata);
+                    return _api.ProcessAsset(asset);
+                }
             }
         }
         catch (FileNotFoundException)
@@ -346,6 +353,7 @@ public class MicrosoftFileShareCrawler : ICrawler
     
     /// <summary>
     /// get all the required details of an SmbFile and put it inside a crawler document
+    /// do not download the file's data yet, as we need to see if it has changed or not
     /// </summary>
     /// <param name="item">the file being processed</param>
     /// <returns>the crawler document containing all the required metadata</returns>
@@ -365,21 +373,35 @@ public class MicrosoftFileShareCrawler : ICrawler
         asset.LastModified = ToUnixEpochMilliseconds(item.LastWriteTime);
         asset.Metadata[Document.META_CREATED_DATE_TIME] = item.CreatedTime.ToString("yyyy-MM-dd HH:mm:ss", _formatter);
         asset.Created = ToUnixEpochMilliseconds(item.CreatedTime);
+        asset.BinarySize = item.FileSize;
 
-        // asset.LastModified >= _deltaTimeTca
+        return asset;
+    }
+
+
+    /// <summary>
+    /// Downloads asset data for the provided file metadata if specific conditions are met.
+    /// and return the local temporary filename for the data (or empty string if we don't download it)
+    /// </summary>
+    /// <param name="item">The metadata of the file to be downloaded.</param>
+    /// <returns>A string representing the downloaded file path, or an empty string if the file is not downloaded.</returns>
+    private string DownloadAssetData(FileMetadata item)
+    {
         if (item.FileSize > 0L)
         {
+            var fileExtension = Document.GetFileExtension(item.FilePath);
+            var mimetype = FileUtils.FileTypeToMimeType(fileExtension);
             // only download the file if we need to
             if (_api != null && !_api.IsInventoryOnly(mimetype))
             {
                 // Download the file
-                asset.Filename = DownloadFile(item.FilePath);
+                return DownloadFile(item.FilePath);
             }
-            asset.BinarySize = item.FileSize;
         }
 
-        return asset;
+        return "";
     }
+
 
     /// <summary>
     /// Converts a DateTime to Unix epoch (seconds since 1970-01-01 00:00:00 UTC).

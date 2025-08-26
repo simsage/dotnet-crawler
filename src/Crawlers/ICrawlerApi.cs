@@ -9,4 +9,8 @@ public interface ICrawlerApi
     bool HasExceededCapacity();
     bool IsInventoryOnly(string mimeType);
     void VerifyParameters(string name, Dictionary<string, object> propertyMap, List<string> propertyNameList);
+
+    // if the cache is enabled, this method will return true if the asset has been modified since the last time it was seen
+    // if the cache is disabled, it will return true (i.e., it then can't assume anything)
+    bool LastModifiedHasChanged(Asset asset);
 }

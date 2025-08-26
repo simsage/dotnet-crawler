@@ -21,6 +21,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
     private const string NotLoaded = "source not loaded (null)";
     private const string Base64Prefix = ";base64,";
+    private const string lastModifiedPrefix = "last-modified-";
     private readonly bool _isWindows = RockUtils.IsWindows();
     private const int CacheLifespanInDays = 30;
     private const int MaxUploadBlockSize = 1024 * 1024 * 10; // 10MB
@@ -359,6 +360,37 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
     public string GetDeltaState() => _source?.DeltaIndicator ?? "";
 
+    
+    /// <summary>
+    /// Determines if the "Last Modified" timestamp of the given asset has changed by comparing it with a cached value.
+    /// Updates the cache with the new timestamp if changed.
+    /// </summary>
+    /// <param name="asset">The asset whose "Last Modified" timestamp is to be checked.</param>
+    /// <returns>
+    /// Returns true if the "Last Modified" timestamp of the asset has changed or the cache is disabled, otherwise false.
+    /// </returns>
+    public bool LastModifiedHasChanged(Asset asset)
+    {
+        // has this asset already been sent?
+        if (_cacheDao != null)
+        {
+            var cachedHash = _cacheDao.Get(lastModifiedPrefix + asset.Url);
+            if (cachedHash != "" && cachedHash == asset.LastModified.ToString())
+            {
+                MarkFileAsSeen(asset); // hasn't changed, just mark it as seen
+                return false;
+            }
+            // set the item's data in the cache, it has changed
+            _cacheDao.Set(
+                lastModifiedPrefix + asset.Url, 
+                asset.LastModified.ToString(), 
+                CacheLifespanInDays * 3600_000L * 24L
+                );
+        }
+
+        return true;
+    }
+    
 
     /// <summary>
     /// Processes the given asset by performing validation, encoding, and uploading it to the system.
