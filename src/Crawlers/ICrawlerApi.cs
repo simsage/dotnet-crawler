@@ -7,7 +7,7 @@ public interface ICrawlerApi
     bool ProcessAsset(Asset asset);
     void MarkFileAsSeen(Asset asset);
     bool HasExceededCapacity();
-    bool IsInventoryOnly(string mimeType);
+    bool IsInventoryOnly(Asset asset);
     void VerifyParameters(string name, Dictionary<string, object> propertyMap, List<string> propertyNameList);
 
     // if the cache is enabled, this method will return true if the asset has been modified since the last time it was seen

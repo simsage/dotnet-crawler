@@ -194,11 +194,8 @@ public class Source : IComparable<Source>
     // is the given mimeType part of the inventory only mimeTypes for this source?
     public bool IsInventoryOnly(string mimeType)
     {
-        // is inventory only "switched off"? i.e., nothing goes into the inventory
-        if (!InventoryOnlyInclude && !InventoryOnlyMimeTypes.Any()) return false;
         // empty mime-types cannot be processed - so they go straight into the inventory
         if (mimeType.Trim().Length == 0) return true;
-        if (!InventoryOnlyMimeTypes.Any()) return InventoryOnlyInclude;
         var index = mimeType.IndexOf(';');
         var inList = index > 0
             ? InventoryOnlyMimeTypes.Contains(mimeType.Substring(0, index).Trim().ToLowerInvariant())

@@ -175,11 +175,16 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     }
 
     // is this an inventory-only asset?
-    public bool IsInventoryOnly(string mimeType)
+    public bool IsInventoryOnly(Asset asset)
     {
+        var maxBinarySize = FileUtils.MaximumSizeInBytesForMimeType(asset.MimeType);
+        // too big
+        if (asset.BinarySize > maxBinarySize) return true;
+        if (asset.BinarySize <= 0) return true;
+        if (!FileUtils.IsValidMimeType(asset.MimeType)) return true;
         if (_source == null)
             throw new ArgumentException("source is null");
-        return _source.IsInventoryOnly(mimeType);
+        return _source.IsInventoryOnly(asset.MimeType);
     }
 
     /// <summary>
@@ -375,7 +380,11 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         if (_cacheDao != null)
         {
             var cachedHash = _cacheDao.Get(lastModifiedPrefix + asset.Url);
-            if (cachedHash != "" && cachedHash == asset.LastModified.ToString())
+            if (cachedHash == "")
+            {
+                return true; // DNE, write it as having changed
+            }
+            if (cachedHash == asset.LastModified.ToString())
             {
                 MarkFileAsSeen(asset); // hasn't changed, just mark it as seen
                 return false;
@@ -435,12 +444,13 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                 MarkFileAsSeen(externalAsset);
                 return true;
             }
-            // set the item's data in cache
+            // set the item's data in cache for last modified and for content hash
+            _cacheDao.Set(lastModifiedPrefix + externalAsset.Url, externalAsset.LastModified.ToString(), CacheLifespanInDays * 3600_000L * 24L);
             _cacheDao.Set(externalAsset.Url, assetHash, CacheLifespanInDays * 3600_000L * 24L);
         }
 
         // is this an inventory-only asset?  don't send the bytes
-        if (_source?.IsInventoryOnly(externalAsset.MimeType) == true)
+        if (IsInventoryOnly(externalAsset))
         {
             externalAsset.RemoveAssetTempFile();
         }

@@ -29,6 +29,12 @@ public class FileUtils
         }
         return 50L * 1024L * 1024L; // Default
     }
+
+    // return true if this is a known mime-type    
+    public static bool IsValidMimeType(string mimeType)
+    {
+        return mimeTypeToRegisteredFile.TryGetValue(mimeType, out var rf);
+    }
     
     public static void Shutdown(int exitCode) { Environment.Exit(exitCode); }
 

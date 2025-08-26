@@ -291,7 +291,7 @@ public class MicrosoftFileShareCrawler : ICrawler
             {
                 if (_api.LastModifiedHasChanged(asset))
                 {
-                    asset.Filename = DownloadAssetData(metadata);
+                    asset.Filename = DownloadAssetData(asset, metadata);
                     return _api.ProcessAsset(asset);
                 }
             }
@@ -385,14 +385,12 @@ public class MicrosoftFileShareCrawler : ICrawler
     /// </summary>
     /// <param name="item">The metadata of the file to be downloaded.</param>
     /// <returns>A string representing the downloaded file path, or an empty string if the file is not downloaded.</returns>
-    private string DownloadAssetData(FileMetadata item)
+    private string DownloadAssetData(Asset asset, FileMetadata item)
     {
         if (item.FileSize > 0L)
         {
-            var fileExtension = Document.GetFileExtension(item.FilePath);
-            var mimetype = FileUtils.FileTypeToMimeType(fileExtension);
             // only download the file if we need to
-            if (_api != null && !_api.IsInventoryOnly(mimetype))
+            if (_api != null && !_api.IsInventoryOnly(asset))
             {
                 // Download the file
                 return DownloadFile(item.FilePath);
