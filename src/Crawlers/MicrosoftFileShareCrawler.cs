@@ -153,9 +153,9 @@ public class MicrosoftFileShareCrawler : ICrawler
 
     private List<LdapGroup> CreateDomainGroups() 
     {
-        var domainGroupList = List<LdapGroup>();
+        var domainGroupList = new List<LdapGroup>();
         domainGroupList.Add(
-            new Group
+            new LdapGroup
             {
                 DistinguishedName = "Users",
                 SamAccountName = "Users",
@@ -164,7 +164,7 @@ public class MicrosoftFileShareCrawler : ICrawler
             }
         );
         domainGroupList.Add(
-            new Group
+            new LdapGroup
             {
                 DistinguishedName = "Administrators",
                 SamAccountName = "Administrators",
@@ -537,13 +537,17 @@ public class MicrosoftFileShareCrawler : ICrawler
         var assetAclList = new List<AssetAcl>();
         item.AccessControlList.ForEach(ace =>
         {
-            if (ace.Type == "Well-Known" && _adGroups.Contains(ace.Identity.ToLower()))
+            if (ace.Type == "Well-Known" && _adGroups.ContainsKey(ace.Identity.ToLower()))
             {
                 // these shall pass
             }
             else if (ace.Type != "Domain" && ace.Type != "Local")
             {
                 return; // Continue to the next ACE
+            }
+            if (ace.AccessControlType != "Allow")
+            {
+                return; // not allowed to access
             }
 
             const bool write = false;
