@@ -951,7 +951,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// <summary>
     /// the windows platform has some strange encodings Windows-1252 - convert a list of acls if necessary
     /// </summary>
-    private static List<AssetAcl> EncodeAclList(List<AssetAcl> acls)
+    public static List<AssetAcl> EncodeAclList(List<AssetAcl> acls)
     {
         var newAclList = new List<AssetAcl>();
         foreach (var acl in acls)
