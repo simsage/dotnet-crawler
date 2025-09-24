@@ -169,19 +169,26 @@ public class MicrosoftFileShareCrawler : ICrawler
             try
             {
                 var reader = new LdapReader(parameters.AdPath, parameters.UseSsl, parameters.Username, parameters.Password);
+                var groupUserResolver = new Dictionary<string, LdapUser>();
+                var groupGroupResolver = new Dictionary<string, LdapGroup>();
+                foreach (var user in reader.GetAllUsers())
+                {
+                    adUser[user.Identity] = user;
+                    groupUserResolver[user.DistinguishedName.ToLower()] = user;
+                }
                 foreach (var group in reader.GetAllGroups())
                 {
                     adGroups[group.Identity] = group;
+                    groupGroupResolver[group.DistinguishedName.ToLower()] = group;
                 }
                 foreach (var group in CreateDomainGroups())
                 {
                     adGroups[group.Identity] = group;
+                    groupGroupResolver[group.DistinguishedName.ToLower()] = group;
                 }
 
-                foreach (var user in reader.GetAllUsers())
-                {
-                    adUser[user.Identity] = user;
-                }
+                // fix the group memberships
+                reader.ResolveGroups(adGroups.Values.ToList(), groupUserResolver, groupGroupResolver);
             }
             catch
             {

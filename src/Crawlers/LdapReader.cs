@@ -183,6 +183,61 @@ public class LdapReader
     }
 
     /// <summary>
+    /// resolve the members of groups down to users and groups
+    /// </summary>
+    /// <param name="groupList">the list of groups to resolve</param>
+    /// <param name="userResolver">the map of distinguishedUser -> user</param>
+    /// <param name="groupResolver">the map of distinguisedGroup -> group</param>
+    public void ResolveGroups(List<LdapGroup> groupList, Dictionary<string, LdapUser> userResolver, Dictionary<string, LdapGroup> groupResolver)
+    {
+        // parent-group -> list of group members
+        var groupFlattener = new Dictionary<string, List<string>>();
+        var groupLookup = new Dictionary<string, LdapGroup>();
+        foreach (var group in groupList)
+        {
+            var thisGroup = group.DistinguishedName.ToLower();
+            groupFlattener[thisGroup] = new List<string>();
+            groupLookup[thisGroup] = group;
+            var newMemberList = new List<string>();
+            foreach (var member in group.Members)
+            {
+                var memberLwr = member.ToLowerInvariant();
+                if (userResolver.TryGetValue(memberLwr, out var user))
+                {
+                    newMemberList.Add(user.Email);
+                }
+                else if (groupResolver.TryGetValue(memberLwr, out var group2))
+                {
+                    groupFlattener[thisGroup].Add(memberLwr);
+                }
+            }
+            group.Members = newMemberList;
+        }
+        foreach (var key in groupFlattener.Keys)
+        {
+            if (!groupLookup.ContainsKey(key)) continue;
+            var parentGroup = groupLookup[key];
+            var groupListInside = groupFlattener[key];
+            if (groupListInside != null && groupListInside.Count > 0)
+            {
+                foreach (var groupInside in groupListInside)
+                {
+                    if (!groupLookup.ContainsKey(groupInside)) continue;
+                    var groupI = groupLookup[groupInside];
+                    foreach (var user in groupI.Members)
+                    {
+                        if (!parentGroup.Members.Contains(user))
+                        {
+                            parentGroup.Members.Add(user);
+                        }
+                    }
+                }
+                Console.WriteLine("test");
+            }
+        }
+    }
+
+    /// <summary>
     /// Helper method to safely retrieve a property value from a SearchResult.
     /// </summary>
     private string GetProperty(SearchResult result, string propertyName)
