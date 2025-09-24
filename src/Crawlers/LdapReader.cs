@@ -2,6 +2,7 @@ namespace Crawlers;
 
 using System.Collections.Generic;
 using System.DirectoryServices;
+using System.Security.Principal;
 
 /// <summary>
 /// A class to read user and group information from an LDAP directory.
@@ -48,6 +49,7 @@ public class LdapReader
                     // Load only necessary properties to improve performance
                     searcher.PropertiesToLoad.Add("distinguishedName");
                     searcher.PropertiesToLoad.Add("sAMAccountName");
+                    searcher.PropertiesToLoad.Add("objectSid");
                     searcher.PropertiesToLoad.Add("displayName");
                     searcher.PropertiesToLoad.Add("mail");
                     searcher.PropertiesToLoad.Add("givenName");
@@ -61,6 +63,9 @@ public class LdapReader
                     {
                         foreach (SearchResult result in results)
                         {
+                            var sid = new SecurityIdentifier((byte[])result.Properties["objectSid"][0], 0);
+                            var ntAccount = (NTAccount)sid.Translate(typeof(NTAccount));
+
                             LdapUser user = new LdapUser
                             {
                                 DistinguishedName = GetProperty(result, "distinguishedName"),
@@ -68,10 +73,11 @@ public class LdapReader
                                 DisplayName = GetProperty(result, "displayName"),
                                 Email = GetProperty(result, "mail"),
                                 FirstName = GetProperty(result, "givenName"),
-                                LastName = GetProperty(result, "sn")
+                                LastName = GetProperty(result, "sn"),
+                                Identity = ntAccount.Value.ToLower()
                             };
 
-                            if (user.Email != "")
+                            if (user.Email != "" && user.Identity != "")
                             {
                                 // Get direct group memberships (returns DNs)
                                 if (result.Properties.Contains("memberOf"))
@@ -87,7 +93,7 @@ public class LdapReader
                     }
                 }
             }
-            Logger.Info($"Found {users.Count} users with email addresses.");
+            Logger.Info($"Found {users.Count} users with email addresses and identities.");
         }
         catch (DirectoryServicesCOMException ex)
         {
@@ -122,6 +128,7 @@ public class LdapReader
                     searcher.PropertiesToLoad.Add("distinguishedName");
                     searcher.PropertiesToLoad.Add("sAMAccountName");
                     searcher.PropertiesToLoad.Add("displayName");
+                    searcher.PropertiesToLoad.Add("objectSid");
                     searcher.PropertiesToLoad.Add("member"); // Direct members (users or other groups)
 
                     searcher.PageSize = 1000; // Optimize for large results
@@ -131,11 +138,15 @@ public class LdapReader
                     {
                         foreach (SearchResult result in results)
                         {
+                            var sid = new SecurityIdentifier((byte[])result.Properties["objectSid"][0], 0);
+                            var ntAccount = (NTAccount)sid.Translate(typeof(NTAccount));
+
                             LdapGroup group = new LdapGroup
                             {
                                 DistinguishedName = GetProperty(result, "distinguishedName"),
                                 SamAccountName = GetProperty(result, "sAMAccountName"),
-                                DisplayName = GetProperty(result, "displayName")
+                                DisplayName = GetProperty(result, "displayName"),
+                                Identity = ntAccount.Value.ToLower()
                             };
 
                             // Get direct members (returns DNs)
@@ -146,7 +157,10 @@ public class LdapReader
                                     group.Members.Add(memberDn);
                                 }
                             }
-                            groups.Add(group);
+                            if (group.Identity != "")
+                            {
+                                groups.Add(group);
+                            }
                         }
                     }
                 }

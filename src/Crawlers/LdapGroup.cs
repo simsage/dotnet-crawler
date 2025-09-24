@@ -9,6 +9,7 @@ public class LdapGroup
 {
     public string DistinguishedName { get; set; } = "";
     public string SamAccountName { get; set; } = "";
+    public string Identity { get; set; } = "";
     public string DisplayName { get; set; } = "";
     /// <summary>
     /// A list of Distinguished Names (DNs) of the direct members (users or other groups) of this group.
@@ -17,7 +18,7 @@ public class LdapGroup
 
     public override string ToString()
     {
-        return $"Group: {DisplayName} ({SamAccountName}) - DN: {DistinguishedName}";
+        return $"Group: {DisplayName} ({SamAccountName}) {Identity} - DN: {DistinguishedName}";
     }
 }
 

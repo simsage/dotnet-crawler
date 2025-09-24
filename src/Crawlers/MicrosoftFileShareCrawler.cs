@@ -170,15 +170,12 @@ public class MicrosoftFileShareCrawler : ICrawler
                 var reader = new LdapReader(parameters.AdPath, parameters.UseSsl, parameters.Username, parameters.Password);
                 foreach (var group in reader.GetAllGroups())
                 {
-                    adGroups[group.DisplayName] = group;
+                    adGroups[group.Identity] = group;
                 }
 
                 foreach (var user in reader.GetAllUsers())
                 {
-                    if (user.Email != "")
-                    {
-                        adUser[user.Email] = user;
-                    }
+                    adUser[user.Identity] = user;
                 }
             }
             catch
@@ -518,11 +515,18 @@ public class MicrosoftFileShareCrawler : ICrawler
             const bool delete = false;
 
             AssetAcl? acl = null;
-            if (_adUsers.TryGetValue(ace.Email.Trim().ToLowerInvariant(), out var user))
+            if (_adUsers.TryGetValue(ace.Identity.Trim().ToLowerInvariant(), out var user))
             {
-                var email = ace.Email;
-                var givenName = user.DisplayName;
-                if (!string.IsNullOrEmpty(email) && !string.IsNullOrEmpty(givenName))
+                var email = user.Email;
+                var samAccount = user.SamAccountName ?? "";
+                if (samAccount.Length > 1)
+                {
+                    samAccount = char.ToUpper(samAccount[0]) + samAccount.Substring(1).ToLower();
+                } else {
+                    samAccount = samAccount.ToUpper();
+                }
+                var givenName = (user.DisplayName == "") ? samAccount : user.DisplayName;
+                if (!string.IsNullOrEmpty(email))
                 {
                     acl = new AssetAcl(
                         email,
@@ -531,7 +535,7 @@ public class MicrosoftFileShareCrawler : ICrawler
                     );
                 }
             }
-            else if (_adGroups.TryGetValue(ace.Identity.Trim(), out var group))
+            else if (_adGroups.TryGetValue(ace.Identity.Trim().ToLowerInvariant(), out var group))
             {
                 acl = new AssetAcl(
                     group.DisplayName,
