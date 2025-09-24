@@ -11,19 +11,21 @@ public class LdapReader
 {
     private static readonly RockLogger Logger = RockLogger.GetLogger(typeof(LdapReader));
 
-    private readonly string _ldapPath;
+    private readonly string _adPath;
+    private readonly bool _useSSL;
     private readonly string _username;
     private readonly string _password;
 
     /// <summary>
     /// Initializes a new instance of the LdapReader class.
     /// </summary>
-    /// <param name="ldapPath">The LDAP path (e.g., "LDAP://yourdomain.com/DC=yourdomain,DC=com").</param>
+    /// <param name="adPath">The LDAP path (e.g., "DC=yourdomain,DC=com").</param>
     /// <param name="username">The username for binding to LDAP (e.g., "yourdomain\\username" or "username@yourdomain.com").</param>
     /// <param name="password">The password for the specified username.</param>
-    public LdapReader(string ldapPath, string username, string password)
+    public LdapReader(string adPath, bool useSSL, string username, string password)
     {
-        _ldapPath = ldapPath;
+        _adPath = adPath;
+        _useSSL = useSSL;
         _username = username;
         _password = password;
     }
@@ -35,13 +37,14 @@ public class LdapReader
     public List<LdapUser> GetAllUsers()
     {
         List<LdapUser> users = new List<LdapUser>();
+        string ldapPath = _useSSL ? $"LDAPS://CN=Users,{_adPath}" : $"LDAP://CN=Users,{_adPath}";
         try
         {
-            using (DirectoryEntry entry = new DirectoryEntry(_ldapPath, _username, _password))
+            using (DirectoryEntry entry = new DirectoryEntry(ldapPath, _username, _password))
             {
                 using (DirectorySearcher searcher = new DirectorySearcher(entry))
                 {
-                    searcher.Filter = "(objectClass=user)";
+                    searcher.Filter = "(&(objectClass=user)(objectCategory=person))";
                     // Load only necessary properties to improve performance
                     searcher.PropertiesToLoad.Add("distinguishedName");
                     searcher.PropertiesToLoad.Add("sAMAccountName");
@@ -68,20 +71,23 @@ public class LdapReader
                                 LastName = GetProperty(result, "sn")
                             };
 
-                            // Get direct group memberships (returns DNs)
-                            if (result.Properties.Contains("memberOf"))
+                            if (user.Email != "")
                             {
-                                foreach (string groupDn in result.Properties["memberOf"])
+                                // Get direct group memberships (returns DNs)
+                                if (result.Properties.Contains("memberOf"))
                                 {
-                                    user.MemberOfGroups.Add(groupDn);
+                                    foreach (string groupDn in result.Properties["memberOf"])
+                                    {
+                                        user.MemberOfGroups.Add(groupDn);
+                                    }
                                 }
+                                users.Add(user);
                             }
-                            users.Add(user);
                         }
                     }
                 }
             }
-            Logger.Info($"Found {users.Count} users.");
+            Logger.Info($"Found {users.Count} users with email addresses.");
         }
         catch (DirectoryServicesCOMException ex)
         {
@@ -91,9 +97,9 @@ public class LdapReader
                 Logger.Error($"Extended Error: {ex.ExtendedErrorMessage}");
             }
         }
-        catch
+        catch (Exception ex2)
         {
-            Logger.Error("An unexpected error occurred while fetching users:");
+            Logger.Error($"An unexpected error occurred while fetching users: {ex2.Message} (bad AD path {ldapPath})");
         }
         return users;
     }
@@ -105,9 +111,10 @@ public class LdapReader
     public List<LdapGroup> GetAllGroups()
     {
         List<LdapGroup> groups = new List<LdapGroup>();
+        string ldapPath = _useSSL ? $"LDAPS://CN=Users,{_adPath}" : $"LDAP://CN=Users,{_adPath}";
         try
         {
-            using (DirectoryEntry entry = new DirectoryEntry(_ldapPath, _username, _password))
+            using (DirectoryEntry entry = new DirectoryEntry(ldapPath, _username, _password))
             {
                 using (DirectorySearcher searcher = new DirectorySearcher(entry))
                 {
@@ -154,9 +161,9 @@ public class LdapReader
                 Logger.Error($"Extended Error: {ex.ExtendedErrorMessage}");
             }
         }
-        catch
+        catch (Exception ex2)
         {
-            Logger.Error($"An unexpected error occurred while fetching groups");
+            Logger.Error($"An unexpected error occurred while fetching users: {ex2.Message} (bad AD path {ldapPath})");
         }
         return groups;
     }

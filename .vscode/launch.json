@@ -10,12 +10,11 @@
       "args": [
         "/debug",
         "-crawler", "file",
-        "-server", "https://<yourserver.simsage.ai>/api",
-        "-org", "",
-        "-kb", "",
-        "-sid", "",
+        "-server", "https://test8.simsage.ai/api",
+        "-org", "01995eba-e3b4-a11f-958b-db39190ec88b",
+        "-kb", "01997b1c-3247-c92f-bd5c-7e8cf78fcf8e",
+        "-sid", "c2f320d0-f5ba-37de-a409-78ceaafbaa09",
         "-source", "1",
-        "-aes", ""
       ],
       "cwd": "${workspaceFolder}",
       "console": "internalConsole",

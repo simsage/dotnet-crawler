@@ -97,9 +97,7 @@ public class MicrosoftFileShareCrawler : ICrawler
         string Username,
         string Password,
         bool UseAd,
-        string AdServer,
         string AdPath,
-        string Domain,
         bool UseSsl
     );
 
@@ -139,21 +137,17 @@ public class MicrosoftFileShareCrawler : ICrawler
         // Check if the user wants to use an active directory (optional)
         var useAd = (_propertyMap.TryGetValue("useAD", out var useAdObj) ? useAdObj.ToString() ?? "false" : "false")
             .ToLowerInvariant().Trim() == "true";
-        var adServer = _propertyMap.TryGetValue("activeServer", out var adServerObj)
-            ? adServerObj.ToString() ?? ""
-            : "";
         var useSsl =
             (_propertyMap.TryGetValue("useSSL", out var useSslObj) ? useSslObj.ToString() ?? "false" : "false")
             .ToLowerInvariant().Trim() == "true";
-        var domain = _propertyMap.TryGetValue("domain", out var domainObj) ? domainObj.ToString() ?? "." : ".";
         var adPath = _propertyMap.TryGetValue("adPath", out var adPathObj) ? adPathObj.ToString() ?? "" : "";
 
         if (useAd)
         {
-            _api.VerifyParameters(_name, _propertyMap, ["activeServer", "domain", "adPath", "username", "password"]);
+            _api.VerifyParameters(_name, _propertyMap, ["adPath", "username", "password"]);
         }
 
-        return new CrawlerParameterSet(username, password, useAd, adServer, adPath, domain, useSsl);
+        return new CrawlerParameterSet(username, password, useAd, adPath, useSsl);
     }
 
     /// <summary>
@@ -173,10 +167,7 @@ public class MicrosoftFileShareCrawler : ICrawler
             _logger.Info($"{_name}: Connecting to active directories...");
             try
             {
-                var ldapServer = parameters.UseSsl
-                    ? $"ldaps://{parameters.AdServer}:636"
-                    : $"ldap://{parameters.AdServer}:389";
-                var reader = new LdapReader(ldapServer, parameters.Username, parameters.Password);
+                var reader = new LdapReader(parameters.AdPath, parameters.UseSsl, parameters.Username, parameters.Password);
                 foreach (var group in reader.GetAllGroups())
                 {
                     adGroups[group.DisplayName] = group;
@@ -184,14 +175,17 @@ public class MicrosoftFileShareCrawler : ICrawler
 
                 foreach (var user in reader.GetAllUsers())
                 {
-                    adUser[user.Email] = user;
+                    if (user.Email != "")
+                    {
+                        adUser[user.Email] = user;
+                    }
                 }
             }
             catch
             {
                 _logger.Error(
                     $@"{_name}: cannot connect to Active Directory
-                 (serverIP={parameters.AdServer},username={parameters.Username},secure={parameters.UseSsl},domain={parameters.Domain},adPath={parameters.AdPath})"
+                 (username={parameters.Username},secure={parameters.UseSsl},adPath={parameters.AdPath})"
                 );
                 throw; // Re-throw to indicate a critical setup failure
             }
