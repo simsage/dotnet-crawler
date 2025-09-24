@@ -1,9 +1,9 @@
 namespace Crawlers.Tests;
 
-public class TestACLs
+public class TestAcls
 {
     [Fact]
-    public void ACLTest()
+    public void AclTest()
     {
         var list = PlatformCrawlerCommonProxy.EncodeAclList([
                 new AssetAcl
@@ -29,16 +29,16 @@ public class TestACLs
         Assert.Equal("rock@simsage.ai", l0.Name);
         Assert.Equal("Rock de Vocht", l0.DisplayName);
         Assert.Equal("R", l0.Access);
-        Assert.Equal(true, l0.IsUser);
-        Assert.Equal(0, l0.MembershipList.Count);
+        Assert.True(l0.IsUser);
+        Assert.Empty(l0.MembershipList);
 
         var l1 = list[1];
         Assert.Equal("Users", l1.Name);
         Assert.Equal("", l1.DisplayName);
         Assert.Equal("RW", l1.Access);
-        Assert.Equal(false, l1.IsUser);
-        Assert.Equal(1, l1.MembershipList.Count);
-        Assert.True(l1.MembershipList.Contains("rock@simsage.ai"));
+        Assert.False(l1.IsUser);
+        Assert.Single(l1.MembershipList);
+        Assert.Contains("rock@simsage.ai", l1.MembershipList);
     }
 
 }
