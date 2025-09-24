@@ -151,30 +151,6 @@ public class MicrosoftFileShareCrawler : ICrawler
     }
 
 
-    private List<LdapGroup> CreateDomainGroups() 
-    {
-        var domainGroupList = new List<LdapGroup>();
-        domainGroupList.Add(
-            new LdapGroup
-            {
-                DistinguishedName = "Users",
-                SamAccountName = "Users",
-                DisplayName = "Users",
-                Identity = "builtin\\users"
-            }
-        );
-        domainGroupList.Add(
-            new LdapGroup
-            {
-                DistinguishedName = "Administrators",
-                SamAccountName = "Administrators",
-                DisplayName = "Administrators",
-                Identity = "builtin\\administrators"
-            }
-        );
-        return domainGroupList;
-    }
-
     /// <summary>
     /// read the AD users and groups?
     /// </summary>
@@ -564,12 +540,12 @@ public class MicrosoftFileShareCrawler : ICrawler
                 } else {
                     samAccount = samAccount.ToUpper();
                 }
-                var givenName = (user.DisplayName == "") ? samAccount : user.DisplayName;
+                var displayName = (user.DisplayName == "") ? samAccount : user.DisplayName;
                 if (!string.IsNullOrEmpty(email))
                 {
                     acl = new AssetAcl(
-                        email,
-                        givenName,
+                        name: email,
+                        displayName,
                         AssetAcl.CreateAccessString(read: true, write: write, delete: delete)
                     );
                 }
@@ -590,6 +566,32 @@ public class MicrosoftFileShareCrawler : ICrawler
             }
         });
         return assetAclList;
+    }
+
+    /// <summary>
+    /// helper: create a list of domain groups to use for standard AD group mapping
+    /// </summary>
+    /// <returns>a list of LdapGroups that are domain well known groups</returns>
+    private List<LdapGroup> CreateDomainGroups() 
+    {
+        var domainGroupList = new List<LdapGroup>
+        {
+            new()
+            {
+                DistinguishedName = "Users",
+                SamAccountName = "Users",
+                DisplayName = "Users",
+                Identity = "builtin\\users"
+            },
+            new()
+            {
+                DistinguishedName = "Administrators",
+                SamAccountName = "Administrators",
+                DisplayName = "Administrators",
+                Identity = "builtin\\administrators"
+            }
+        };
+        return domainGroupList;
     }
 
     public string StateToJson() => ""; // Not implemented, returning empty string as per Kotlin

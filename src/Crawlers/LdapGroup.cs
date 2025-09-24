@@ -14,7 +14,7 @@ public class LdapGroup
     /// <summary>
     /// A list of Distinguished Names (DNs) of the direct members (users or other groups) of this group.
     /// </summary>
-    public List<string> Members { get; set; } = new List<string>();
+    public List<string> Members { get; set; } = [];
 
     public override string ToString()
     {

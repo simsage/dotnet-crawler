@@ -23,20 +23,20 @@ public class AssetAcl
     /// *****User***** constructor
     /// </summary>
     public AssetAcl(string name, string displayName, string access) :
-        this(name, displayName, access, true, new List<string>())
+        this(name, displayName, access, isUser: true, membershipList: new List<string>())
     { }
 
     /// <summary>
     /// *****Group***** constructor
     /// </summary>
     public AssetAcl(string name, string access, List<string> userMemberList) :
-        this(name: name, displayName: "", access: access, isUser: false, membershipList: userMemberList.ToList())
+        this(name, displayName: "", access, isUser: false, membershipList: userMemberList.ToList())
     { }
 
     public AssetAcl(string name, string displayName, string access, bool isUser, List<string> membershipList)
     {
-        Name = name;
-        DisplayName = displayName;
+        Name = name; // group name or email address for users
+        DisplayName = displayName; // full-user name if available
         Access = access;
         IsUser = isUser;
         MembershipList = membershipList;
