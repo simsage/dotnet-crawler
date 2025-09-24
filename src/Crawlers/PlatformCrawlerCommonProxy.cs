@@ -974,7 +974,9 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         {
             Name = RockUtils.Windows1252ToUtf8(acl.Name),
             DisplayName = RockUtils.Windows1252ToUtf8(acl.DisplayName),
-            Access = RockUtils.Windows1252ToUtf8(acl.Access)
+            Access = RockUtils.Windows1252ToUtf8(acl.Access),
+            IsUser = acl.IsUser
+            
         };
         var newMemberList = new List<string>();
         foreach (var member in acl.MembershipList)
