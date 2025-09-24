@@ -150,6 +150,31 @@ public class MicrosoftFileShareCrawler : ICrawler
         return new CrawlerParameterSet(username, password, useAd, adPath, useSsl);
     }
 
+
+    private List<LdapGroup> CreateDomainGroups() 
+    {
+        var domainGroupList = List<LdapGroup>();
+        domainGroupList.Add(
+            new Group
+            {
+                DistinguishedName = "Users",
+                SamAccountName = "Users",
+                DisplayName = "Users",
+                Identity = "builtin\\users"
+            }
+        );
+        domainGroupList.Add(
+            new Group
+            {
+                DistinguishedName = "Administrators",
+                SamAccountName = "Administrators",
+                DisplayName = "Administrators",
+                Identity = "builtin\\administrators"
+            }
+        );
+        return domainGroupList;
+    }
+
     /// <summary>
     /// read the AD users and groups?
     /// </summary>
@@ -169,6 +194,10 @@ public class MicrosoftFileShareCrawler : ICrawler
             {
                 var reader = new LdapReader(parameters.AdPath, parameters.UseSsl, parameters.Username, parameters.Password);
                 foreach (var group in reader.GetAllGroups())
+                {
+                    adGroups[group.Identity] = group;
+                }
+                foreach (var group in CreateDomainGroups())
                 {
                     adGroups[group.Identity] = group;
                 }
@@ -508,8 +537,14 @@ public class MicrosoftFileShareCrawler : ICrawler
         var assetAclList = new List<AssetAcl>();
         item.AccessControlList.ForEach(ace =>
         {
-            if (ace.Type != "Domain" && ace.Type != "Local")
+            if (ace.Type == "Well-Known" && _adGroups.Contains(ace.Identity.ToLower()))
+            {
+                // these shall pass
+            }
+            else if (ace.Type != "Domain" && ace.Type != "Local")
+            {
                 return; // Continue to the next ACE
+            }
 
             const bool write = false;
             const bool delete = false;
@@ -537,8 +572,9 @@ public class MicrosoftFileShareCrawler : ICrawler
             }
             else if (_adGroups.TryGetValue(ace.Identity.Trim().ToLowerInvariant(), out var group))
             {
+                var displayName = (group.DisplayName == "") ? group.SamAccountName : group.DisplayName;
                 acl = new AssetAcl(
-                    group.DisplayName,
+                    displayName,
                     AssetAcl.CreateAccessString(read: true, write: write, delete: delete),
                     group.Members
                 );
