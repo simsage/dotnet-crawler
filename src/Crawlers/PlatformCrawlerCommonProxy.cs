@@ -473,7 +473,6 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         } catch (Exception ex) {
             Logger.Error($"processAsset({encodedAsset.Url}): {ex.Message}");
             _numErrors += 1;
-            return false;
         }
         return true;
     }
