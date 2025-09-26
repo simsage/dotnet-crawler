@@ -243,18 +243,18 @@ public class MicrosoftFileShareCrawler : ICrawler
         {
             _logger.Error($"{_name}: Access denied to directory {currentDirectory}: {ex.Message}");
             if (recursionDepth == 0)
-                return false;
+                return true;
         }
         catch (DirectoryNotFoundException ex)
         {
             _logger.Error($"{_name}: Directory not found: {currentDirectory}: {ex.Message}");
             if (recursionDepth == 0)
-                return false;
+                return true;
         }
         catch
         {
             _logger.Error($"{_name}: An unexpected error occurred while crawling directory {currentDirectory}");
-            return false;
+            return true;
         }
 
         return Active;
@@ -310,7 +310,6 @@ public class MicrosoftFileShareCrawler : ICrawler
         catch
         {
             _logger.Error($"{_name}: An unexpected error occurred while processing file {filePath}");
-            return false;
         }
         finally
         {
