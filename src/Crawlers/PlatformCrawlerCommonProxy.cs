@@ -23,7 +23,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private const string Base64Prefix = ";base64,";
     private const string lastModifiedPrefix = "last-modified-";
     private readonly bool _isWindows = RockUtils.IsWindows();
-    private const int CacheLifespanInDays = 30;
+    private const int CacheLifespanInDays = 365;
     private const int MaxUploadBlockSize = 1024 * 1024 * 10; // 10MB
     public bool Active { get; set; } = true;
 
