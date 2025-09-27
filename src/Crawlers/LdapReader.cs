@@ -182,65 +182,95 @@ public class LdapReader
         return groups;
     }
 
+
     /// <summary>
-    /// resolve the members of groups down to users and groups
+    /// Resolves the members of groups, flattening nested group memberships down to a final list of unique users.
+    /// This method modifies the 'ResolvedUsers' property of each LdapGroup object in the provided list.
     /// </summary>
-    /// <param name="groupList">the list of groups to resolve</param>
-    /// <param name="userResolver">the map of distinguishedUser -> user</param>
-    /// <param name="groupResolver">the map of distinguisedGroup -> group</param>
+    /// <param name="groupList">The list of top-level groups to resolve.</param>
+    /// <param name="userResolver">A dictionary mapping a user's distinguished name to the LdapUser object.</param>
+    /// <param name="groupResolver">A dictionary mapping a group's distinguished name to the LdapGroup object.</param>
     public void ResolveGroups(
-        List<LdapGroup> groupList, 
-        Dictionary<string, LdapUser> userResolver, 
+        List<LdapGroup> groupList,
+        Dictionary<string, LdapUser> userResolver,
         Dictionary<string, LdapGroup> groupResolver
-        ) {
-        // parent-group -> list of group members
-        var groupFlattener = new Dictionary<string, List<string>>();
-        var groupLookup = new Dictionary<string, LdapGroup>();
+    )
+    {
+        // A cache to store the fully resolved user list for a group. This prevents
+        // re-resolving the same group multiple times if it's nested in different parent groups.
+        var resolutionCache = new Dictionary<string, HashSet<LdapUser>>();
+
+        // Iterate through each top-level group and resolve its members.
         foreach (var group in groupList)
         {
-            var thisGroup = group.DistinguishedName.ToLower();
-            groupFlattener[thisGroup] = new List<string>();
-            groupLookup[thisGroup] = group;
-            var newMemberList = new List<string>();
-            foreach (var member in group.Members)
-            {
-                var memberLwr = member.ToLowerInvariant();
-                if (userResolver.TryGetValue(memberLwr, out var user))
-                {
-                    if (!string.IsNullOrEmpty(user.Email))
-                    {
-                        newMemberList.Add(user.Email);
-                    }
-                }
-                else if (groupResolver.TryGetValue(memberLwr, out var group2))
-                {
-                    groupFlattener[thisGroup].Add(memberLwr);
-                }
-            }
-            group.Members = newMemberList;
-        }
-        foreach (var key in groupFlattener.Keys)
-        {
-            if (!groupLookup.ContainsKey(key)) continue;
-            var parentGroup = groupLookup[key];
-            var groupListInside = groupFlattener[key];
-            if (groupListInside != null && groupListInside.Count > 0)
-            {
-                foreach (var groupInside in groupListInside)
-                {
-                    if (!groupLookup.ContainsKey(groupInside)) continue;
-                    var groupI = groupLookup[groupInside];
-                    foreach (var user in groupI.Members)
-                    {
-                        if (!parentGroup.Members.Contains(user))
-                        {
-                            parentGroup.Members.Add(user);
-                        }
-                    }
-                }
-            }
+            // The main recursive logic is in the helper function. We start with an empty path for each top-level group.
+            var resolvedUsers = GetResolvedUsersRecursive(group, userResolver, groupResolver, resolutionCache, new HashSet<string>());
+            group.Members = resolvedUsers.Select(p => p.Email).ToList();
         }
     }
+
+    /// <summary>
+    /// A private helper method that recursively finds all unique users in a group and its subgroups.
+    /// </summary>
+    /// <param name="currentGroup">The group currently being resolved.</param>
+    /// <param name="userResolver">The master dictionary of all users.</param>
+    /// <param name="groupResolver">The master dictionary of all groups.</param>
+    /// <param name="cache">The cache for storing results of already-resolved groups.</param>
+    /// <param name="currentPath">A set tracking the groups visited in the current recursive path to detect cycles.</param>
+    /// <returns>A HashSet of unique LdapUser objects.</returns>
+    private HashSet<LdapUser> GetResolvedUsersRecursive(
+        LdapGroup currentGroup,
+        Dictionary<string, LdapUser> userResolver,
+        Dictionary<string, LdapGroup> groupResolver,
+        Dictionary<string, HashSet<LdapUser>> cache,
+        HashSet<string> currentPath)
+    {
+        // 1. Performance Check: If this group has been resolved before, return the cached result immediately.
+        if (cache.TryGetValue(currentGroup.DistinguishedName, out var cachedUsers))
+        {
+            return cachedUsers;
+        }
+
+        // 2. Cycle Detection: If we have already seen this group in the current resolution path,
+        // we have a circular dependency (e.g., GroupA contains GroupB, and GroupB contains GroupA).
+        // Return an empty set to break the infinite loop.
+        if (!currentPath.Add(currentGroup.DistinguishedName))
+        {
+            return new HashSet<LdapUser>(); // Cycle detected
+        }
+
+        var allUsers = new HashSet<LdapUser>();
+
+        // 3. Process Members: Iterate through the distinguished names of the group's members.
+        foreach (var memberDn in currentGroup.Members)
+        {
+            // Case A: The member is a user.
+            if (userResolver.TryGetValue(memberDn, out var user))
+            {
+                allUsers.Add(user);
+            }
+            // Case B: The member is another group.
+            else if (groupResolver.TryGetValue(memberDn, out var subGroup))
+            {
+                // Recursively call this function to resolve the subgroup.
+                var usersFromSubGroup = GetResolvedUsersRecursive(subGroup, userResolver, groupResolver, cache, currentPath);
+                
+                // Add the users from the subgroup into our main set.
+                // UnionWith is efficient and handles duplicates automatically.
+                allUsers.UnionWith(usersFromSubGroup);
+            }
+        }
+
+        // 4. Backtrack: After processing all members of this group, remove it from the current path.
+        // This allows it to be resolved again if encountered through a different parent group.
+        currentPath.Remove(currentGroup.DistinguishedName);
+
+        // 5. Cache Result: Store the final set of resolved users in the cache before returning.
+        cache[currentGroup.DistinguishedName] = allUsers;
+
+        return allUsers;
+    }
+
 
     /// <summary>
     /// Helper method to safely retrieve a property value from a SearchResult.
