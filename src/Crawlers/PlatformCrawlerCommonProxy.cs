@@ -122,6 +122,14 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     }
 
     /// <summary>
+    /// For unit testing - set the source
+    /// </summary>
+    public void SetSource(Source source)
+    {
+        _source = source;
+    }
+
+    /// <summary>
     /// Retrieves the crawler details from the database and updates the source object.
     /// Also refreshes the source check interval and configures the external source logger if needed.
     /// </summary>
