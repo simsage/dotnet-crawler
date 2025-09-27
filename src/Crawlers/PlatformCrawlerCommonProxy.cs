@@ -61,6 +61,16 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     // the run id
     private long _runId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
+    /// <summary>
+    /// Represents a proxy for a platform crawler, providing integration with SimSage services
+    /// and offering functionality for logging external sources.
+    /// Implements both ICrawlerApi and IExternalSourceLogger interfaces.
+    /// </summary>
+    /// <remarks>
+    /// This class interfaces with SimSage endpoints, initializes system configurations, and optionally
+    /// enables caching for assets using a SQLite database. Required parameters ensure proper setup, while
+    /// optional settings allow customization such as encryption, certificate validation, and caching.
+    /// </remarks>
     public PlatformCrawlerCommonProxy(
         string serviceName,
         string simSageEndpoint,
