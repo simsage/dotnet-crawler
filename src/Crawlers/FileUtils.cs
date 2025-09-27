@@ -40,13 +40,13 @@ public class FileUtils
 
     private static Dictionary<string, RegisteredFile> extensionToRegisteredFile = new Dictionary<string, RegisteredFile>();
     private static Dictionary<string, RegisteredFile> mimeTypeToRegisteredFile = new Dictionary<string, RegisteredFile>();
-    private static readonly object _listLock = new object();
+    private static readonly object UtLock = new object();
 
     private static void AddMimeType(string mimeType, RegisteredFile rf)
     {
         if (mimeTypeToRegisteredFile.ContainsKey(mimeType))
         {
-            lock (_listLock)
+            lock (UtLock)
             {
                 var existing = mimeTypeToRegisteredFile[mimeType];
                 existing.ExtensionList.AddRange(rf.ExtensionList);
@@ -1845,7 +1845,7 @@ public class FileUtils
         AddMimeType("application/x-zpaq", new RegisteredFile("application/x-zpaq", ["zpaq"], "ZPAQ Archive Format", "*", 50));
         AddMimeType("application/octet-stream", new RegisteredFile("application/octet-stream", ["zpaq"], "ZPAQ Archive Format", "*", 50));
 
-        lock (_listLock)
+        lock (UtLock)
         {
             foreach (RegisteredFile rf in mimeTypeToRegisteredFile.Values)
             {
