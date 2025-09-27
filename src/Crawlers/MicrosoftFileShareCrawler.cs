@@ -178,17 +178,17 @@ public class MicrosoftFileShareCrawler : ICrawler
                 var groupGroupResolver = new Dictionary<string, LdapGroup>();
                 foreach (var user in reader.GetAllUsers())
                 {
-                    adUser[user.Identity] = user;
+                    adUser[user.Identity.ToLower()] = user;
                     groupUserResolver[user.DistinguishedName.ToLower()] = user;
                 }
                 foreach (var group in reader.GetAllGroups())
                 {
-                    adGroups[group.Identity] = group;
+                    adGroups[group.Identity.ToLower()] = group;
                     groupGroupResolver[group.DistinguishedName.ToLower()] = group;
                 }
                 foreach (var group in CreateDomainGroups())
                 {
-                    adGroups[group.Identity] = group;
+                    adGroups[group.Identity.ToLower()] = group;
                     groupGroupResolver[group.DistinguishedName.ToLower()] = group;
                 }
 
@@ -374,7 +374,7 @@ public class MicrosoftFileShareCrawler : ICrawler
         var fileExtension = Document.GetFileExtension(asset.Url);
         var mimetype = FileUtils.FileTypeToMimeType(fileExtension);
         asset.MimeType = mimetype;
-        asset.Acls.AddRange(ConvertAcls(item));
+        asset.Acls.AddRange(ConvertAcls(item.AccessControlList, _adUsers, _adGroups));
 
         asset.Metadata[Document.META_LAST_MODIFIED_DATE_TIME] = item.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss", _formatter);
         asset.LastModified = ToUnixEpochMilliseconds(item.LastWriteTime);
@@ -515,16 +515,22 @@ public class MicrosoftFileShareCrawler : ICrawler
 
 
     /// <summary>
-    /// convert the security principals for a file
+    /// convert the security principals of files
     /// </summary>
-    /// <param name="item">the item to get ACLs for</param>
+    /// <param name="accessControlList">the ACLs to convert</param>
+    /// <param name="adUsers">a dictionary of available users for translation of ACLs</param>
+    /// <param name="adGroups">a dictionary of avaialble groups for translation of ACLs</param>
     /// <returns>a set of ACLs</returns>
-    private List<AssetAcl> ConvertAcls(FileMetadata item)
+    public static List<AssetAcl> ConvertAcls(
+        List<AccessControlEntry> accessControlList,
+        Dictionary<string, LdapUser> adUsers,
+        Dictionary<string, LdapGroup> adGroups
+        )
     {
         var assetAclList = new List<AssetAcl>();
-        item.AccessControlList.ForEach(ace =>
+        accessControlList.ForEach(ace =>
         {
-            if (ace.Type == "Well-Known" && _adGroups.ContainsKey(ace.Identity.ToLower()))
+            if (ace.Type == "Well-Known" && adGroups.ContainsKey(ace.Identity.ToLower()))
             {
                 // these shall pass
             }
@@ -541,7 +547,7 @@ public class MicrosoftFileShareCrawler : ICrawler
             const bool delete = false;
 
             AssetAcl? acl = null;
-            if (_adUsers.TryGetValue(ace.Identity.Trim().ToLowerInvariant(), out var user))
+            if (adUsers.TryGetValue(ace.Identity.Trim().ToLowerInvariant(), out var user))
             {
                 if (!string.IsNullOrEmpty(user.Email))
                 {
@@ -561,7 +567,7 @@ public class MicrosoftFileShareCrawler : ICrawler
                     );
                 }
             }
-            else if (_adGroups.TryGetValue(ace.Identity.Trim().ToLowerInvariant(), out var group))
+            else if (adGroups.TryGetValue(ace.Identity.Trim().ToLowerInvariant(), out var group))
             {
                 var displayName = (group.DisplayName == "") ? group.SamAccountName : group.DisplayName;
                 acl = new AssetAcl(
