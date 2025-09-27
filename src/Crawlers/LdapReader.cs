@@ -188,8 +188,11 @@ public class LdapReader
     /// <param name="groupList">the list of groups to resolve</param>
     /// <param name="userResolver">the map of distinguishedUser -> user</param>
     /// <param name="groupResolver">the map of distinguisedGroup -> group</param>
-    public void ResolveGroups(List<LdapGroup> groupList, Dictionary<string, LdapUser> userResolver, Dictionary<string, LdapGroup> groupResolver)
-    {
+    public void ResolveGroups(
+        List<LdapGroup> groupList, 
+        Dictionary<string, LdapUser> userResolver, 
+        Dictionary<string, LdapGroup> groupResolver
+        ) {
         // parent-group -> list of group members
         var groupFlattener = new Dictionary<string, List<string>>();
         var groupLookup = new Dictionary<string, LdapGroup>();
@@ -204,7 +207,10 @@ public class LdapReader
                 var memberLwr = member.ToLowerInvariant();
                 if (userResolver.TryGetValue(memberLwr, out var user))
                 {
-                    newMemberList.Add(user.Email);
+                    if (!string.IsNullOrEmpty(user.Email))
+                    {
+                        newMemberList.Add(user.Email);
+                    }
                 }
                 else if (groupResolver.TryGetValue(memberLwr, out var group2))
                 {
@@ -232,7 +238,6 @@ public class LdapReader
                         }
                     }
                 }
-                Console.WriteLine("test");
             }
         }
     }

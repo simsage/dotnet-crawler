@@ -538,17 +538,17 @@ public class MicrosoftFileShareCrawler : ICrawler
             AssetAcl? acl = null;
             if (_adUsers.TryGetValue(ace.Identity.Trim().ToLowerInvariant(), out var user))
             {
-                var email = user.Email;
-                var samAccount = user.SamAccountName ?? "";
-                if (samAccount.Length > 1)
+                if (!string.IsNullOrEmpty(user.Email))
                 {
-                    samAccount = char.ToUpper(samAccount[0]) + samAccount.Substring(1).ToLower();
-                } else {
-                    samAccount = samAccount.ToUpper();
-                }
-                var displayName = (user.DisplayName == "") ? samAccount : user.DisplayName;
-                if (!string.IsNullOrEmpty(email))
-                {
+                    var email = user.Email;
+                    var samAccount = user.SamAccountName ?? "";
+                    if (samAccount.Length > 1)
+                    {
+                        samAccount = char.ToUpper(samAccount[0]) + samAccount.Substring(1).ToLower();
+                    } else {
+                        samAccount = samAccount.ToUpper();
+                    }
+                    var displayName = (user.DisplayName == "") ? samAccount : user.DisplayName;
                     acl = new AssetAcl(
                         name: email,
                         displayName,

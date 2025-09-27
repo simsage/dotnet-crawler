@@ -5,7 +5,7 @@ public class TestAcls
     [Fact]
     public void AclTest()
     {
-        var list = PlatformCrawlerCommonProxy.EncodeAclList([
+        var list = new List<AssetAcl>([
                 new AssetAcl
                 {
                     Name = "rock@simsage.ai",
