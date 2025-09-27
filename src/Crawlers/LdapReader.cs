@@ -102,10 +102,12 @@ public class LdapReader
             {
                 Logger.Error($"Extended Error: {ex.ExtendedErrorMessage}");
             }
+            throw;
         }
         catch (Exception ex2)
         {
             Logger.Error($"An unexpected error occurred while fetching users: {ex2.Message} (bad AD path {ldapPath})");
+            throw;
         }
         return users;
     }
@@ -174,10 +176,12 @@ public class LdapReader
             {
                 Logger.Error($"Extended Error: {ex.ExtendedErrorMessage}");
             }
+            throw;
         }
         catch (Exception ex2)
         {
             Logger.Error($"An unexpected error occurred while fetching users: {ex2.Message} (bad AD path {ldapPath})");
+            throw;
         }
         return groups;
     }

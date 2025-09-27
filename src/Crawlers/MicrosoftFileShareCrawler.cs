@@ -56,14 +56,19 @@ public class MicrosoftFileShareCrawler : ICrawler
     public bool Run()
     {
         _logger.Info($"{_name}: file crawler starting");
-        Test(); // make sure we can connect before starting
-
         var parameters = GetParameters();
 
         // get AD information if set up
-        var (users, groups) = SetupAdUsersAndGroups(parameters);
-        _adUsers = users;
-        _adGroups = groups;
+        try
+        {
+            var (users, groups) = SetupAdUsersAndGroups(parameters);
+            _adUsers = users;
+            _adGroups = groups;
+        }
+        catch
+        {
+            return false; // connection to AD failed
+        }
 
         // do it and return the exit status
         return CrawlDirectory(_shareStartPath, 0);
@@ -187,7 +192,7 @@ public class MicrosoftFileShareCrawler : ICrawler
                     groupGroupResolver[group.DistinguishedName.ToLower()] = group;
                 }
 
-                // fix the group memberships
+                // fix the group memberships - flatten the groups
                 reader.ResolveGroups(adGroups.Values.ToList(), groupUserResolver, groupGroupResolver);
             }
             catch
