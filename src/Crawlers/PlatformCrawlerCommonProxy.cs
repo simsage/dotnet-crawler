@@ -27,7 +27,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private const int CacheLifespanInDays = 365;
     private const int MaxUploadBlockSize = 1024 * 1024 * 10; // 10MB
     // if SimSage isn't reacable, wait this many seconds
-    private const int WaitForNetworkErrorTimeoutInSeconds = 60;
+    public static int WaitForNetworkErrorTimeoutInSeconds = 60;
     public bool Active { get; set; } = true;
 
     private readonly string _simSageEndpoint;
@@ -57,7 +57,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private Source? _source;
     private long _sourceNextRefreshTime;
     private const long SourceRefreshInterval = 120_000L; // 2L * 60_000L // every 2 minutes
-    
+
     // crawler cache
     private readonly SqliteAssetDao? _cacheDao;
 
@@ -386,7 +386,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
     public string GetDeltaState() => _source?.DeltaIndicator ?? "";
 
-    
+
     /// <summary>
     /// Determines if the "Last Modified" timestamp of the given asset has changed by comparing it with a cached value.
     /// Updates the cache with the new timestamp if changed.
@@ -412,15 +412,15 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
             }
             // set the item's data in the cache, it has changed
             _cacheDao.Set(
-                lastModifiedPrefix + asset.Url, 
-                asset.LastModified.ToString(), 
+                lastModifiedPrefix + asset.Url,
+                asset.LastModified.ToString(),
                 CacheLifespanInDays * 3600_000L * 24L
                 );
         }
 
         return true;
     }
-    
+
 
     /// <summary>
     /// Processes the given asset by performing validation, encoding, and uploading it to the system.
@@ -432,10 +432,9 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         // upload - valid or invalid (i.e. data/mime-type or no mime-type - all valid
         _numFilesUploaded += 1;
 
-        try {
+        try
+        {
             CheckCrawler();
-
-            Thread.Sleep(2000);
 
             // check we have the minimum requirements that the asset is valid
             if (externalAsset.Url.Trim().Length == 0)
@@ -484,14 +483,16 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
             FileUploadPost(
                 _organisationId, _kbId, _sid, _sourceId,
-                UploadExternalDocumentCmd.Convert(externalAsset), 
+                UploadExternalDocumentCmd.Convert(externalAsset),
                 externalAsset.Filename,
                 _useEncryption, _runId, seed, _simSageEndpoint, _simSageApiVersion,
                 FileUtils.MaximumSizeInBytesForMimeType(externalAsset.MimeType),
                 _allowSelfSignedCertificate
             );
 
-        } catch (Exception ex) {
+        }
+        catch (Exception ex)
+        {
             Logger.Error($"processAsset({externalAsset.Url}): {ex.Message}", ex);
             _numErrors += 1;
         }
@@ -697,7 +698,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
             _running = false;
             return;
         }
-        
+
         // cleanup cache
         _cacheDao?.CleanupExpiredEntries();
 
@@ -787,10 +788,10 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
             Thread.Sleep(10_000); // wait 10 seconds before checking again
 
             if (!Active) break;
-            
+
             // get any source changes - if false - we need to re-evaluate our status
             CheckCrawler();
-            
+
             // if the schedule changes, the crawler is no longer "finished"
             if (_source?.Schedule != currentSchedule)
             {
@@ -930,13 +931,13 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private static void FileUploadPost(
         string organisationId, string kbId, string sid, int sourceId,
         UploadExternalDocumentCmd file, string filename, bool useEncryption, long runId, int seed,
-        string simSageEndpoint, string simSageApiVersion, 
+        string simSageEndpoint, string simSageApiVersion,
         long maxSizeInBytes, bool allowSelfSignedCertificate
     )
     {
         var tempFile = !string.IsNullOrEmpty(filename) ? new FileInfo(filename) : null;
         var totalFileSize = tempFile?.Length ?? 0;
-        var jobId = Guid.NewGuid().ToString(); 
+        var jobId = Guid.NewGuid().ToString();
         try
         {
             if (tempFile?.Exists == true && totalFileSize > 0 && totalFileSize < maxSizeInBytes)
@@ -997,22 +998,22 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// <param name="simSageApiVersion">the API version of SimSage</param>
     /// <param name="allowSelfSignedCertificate">lacks security for self signed certs</param>
     private static void PartialUpload(
-        string organisationId, 
-        string kbId, 
-        string sid, 
+        string organisationId,
+        string kbId,
+        string sid,
         int sourceId,
-        int partId, 
-        int totalParts, 
+        int partId,
+        int totalParts,
         byte[]? data,
         int dataSize,
         string jobId,
         long totalFileSize,
-        UploadExternalDocumentCmd file, 
-        bool useEncryption, 
-        long runId, 
+        UploadExternalDocumentCmd file,
+        bool useEncryption,
+        long runId,
         int seed,
-        string simSageEndpoint, 
-        string simSageApiVersion, 
+        string simSageEndpoint,
+        string simSageApiVersion,
         bool allowSelfSignedCertificate
         )
     {
@@ -1041,7 +1042,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         CheckError(data2);
     }
 
-    
+
     /// <summary>
     /// POST JSON data and return json result
     /// </summary>
@@ -1117,10 +1118,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
             }
             catch (Exception ex)
             {
-                if (!string.IsNullOrEmpty(ex.Message) && (
-                    ex.Message.Contains("No connection could be made") ||
-                    ex.Message.Contains("unreachable network")
-                ))
+                if (IsNetWorkError(ex))
                 {
                     // can't log - just write to console
                     Console.WriteLine($"SimSage is not reachable over the network, trying again in {WaitForNetworkErrorTimeoutInSeconds} seconds.");
@@ -1146,15 +1144,15 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         } while (retry);
 
         if (!string.IsNullOrWhiteSpace(str) && useEncryption)
-            {
-                return AesEncryption.Decrypt(
-                    str,
-                    Sha512.GenerateSha512Hash(
-                        _aes ?? "",
-                        SharedSecrets.GetRandomGuid(_aes ?? "", seed).ToString()
-                        )
-                );
-            }
+        {
+            return AesEncryption.Decrypt(
+                str,
+                Sha512.GenerateSha512Hash(
+                    _aes ?? "",
+                    SharedSecrets.GetRandomGuid(_aes ?? "", seed).ToString()
+                    )
+            );
+        }
         return str;
     }
 
@@ -1227,5 +1225,17 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         return _source?.DeltaIndicator ?? "";
     }
 
-    
+
+    // is the given exception a network error?
+    public static bool IsNetWorkError(Exception ex)
+    {
+        return !string.IsNullOrEmpty(ex.Message) && (
+                    ex.Message.Contains("No connection could be made") ||
+                    ex.Message.Contains("network location cannot be reached") ||
+                    ex.Message.Contains("unreachable network") ||
+                    ex.Message.Contains("error code 1231") // network cannot be reached
+                );
+    }
+
+
 }
