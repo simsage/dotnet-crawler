@@ -1117,7 +1117,10 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
             }
             catch (Exception ex)
             {
-                if (!string.IsNullOrEmpty(ex.Message) && ex.Message.Contains("No connection could be made"))
+                if (!string.IsNullOrEmpty(ex.Message) && (
+                    ex.Message.Contains("No connection could be made") ||
+                    ex.Message.Contains("unreachable network")
+                ))
                 {
                     // can't log - just write to console
                     Console.WriteLine($"SimSage is not reachable over the network, trying again in {WaitForNetworkErrorTimeoutInSeconds} seconds.");
