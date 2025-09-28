@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Diagnostics;
+using NUnit.Framework;
 
 /// <summary>
 /// the main communications bus with the external SimSage system to transfer files and data
@@ -25,6 +26,8 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private readonly bool _isWindows = RockUtils.IsWindows();
     private const int CacheLifespanInDays = 365;
     private const int MaxUploadBlockSize = 1024 * 1024 * 10; // 10MB
+    // if SimSage isn't reacable, wait this many seconds
+    private const int WaitForNetworkErrorTimeoutInSeconds = 60;
     public bool Active { get; set; } = true;
 
     private readonly string _simSageEndpoint;
@@ -432,8 +435,11 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         try {
             CheckCrawler();
 
+            Thread.Sleep(2000);
+
             // check we have the minimum requirements that the asset is valid
-            if (externalAsset.Url.Trim().Length == 0) {
+            if (externalAsset.Url.Trim().Length == 0)
+            {
                 Logger.Error($"processAsset: asset url is empty, ignoring {externalAsset.Url}");
                 return true;
             }
@@ -1054,77 +1060,98 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         bool allowSelfSignedCertificate
     )
     {
-        string str;
+        string str = "";
         HttpResponseMessage? response = null;
         HttpClient? client = null;
         var objectType = "";
         var encryptionKey = "";
-        try
+        var retry = false;
+        do
         {
-            client = RockUtils.NewHttpClient(allowSelfSignedCertificate);
-            var request = new HttpRequestMessage(HttpMethod.Post, url);
-            request.Headers.Add("Access-Control-Request-Method", "POST");
-            request.Headers.Add("API-Version", simSageApiVersion);
-
-            var sendMap = new Dictionary<string, object>();
-            for (var i = 0; i < nameValues.Length / 2; i++)
+            retry = false; // assume we succeed
+            try
             {
-                var key = nameValues[i * 2].ToString();
-                if (key == null) continue;
-                var value = nameValues[i * 2 + 1];
-                sendMap[key] = value;
-            }
-            objectType = sendMap.TryGetValue("objectType", out var value1) ? value1.ToString() ?? "" : "";
+                client = RockUtils.NewHttpClient(allowSelfSignedCertificate);
+                var request = new HttpRequestMessage(HttpMethod.Post, url);
+                request.Headers.Add("Access-Control-Request-Method", "POST");
+                request.Headers.Add("API-Version", simSageApiVersion);
 
-            // encrypted?
-            var payload = Mapper.WriteValueAsString(sendMap);
-            if (useEncryption)
-            {
-                encryptionKey = Sha512.GenerateSha512Hash(
-                    _aes ?? "", 
-                    SharedSecrets.GetRandomGuid(_aes ?? "", seed).ToString()
-                    );
-                var encryptedBody = AesEncryption.Encrypt(payload, encryptionKey);
-                if (Verbose)
-                    Logger.Info($"POST encrypted body {encryptedBody.Length} bytes");
-                request.Content = new StringContent(encryptedBody, Encoding.UTF8, "application/json");
+                var sendMap = new Dictionary<string, object>();
+                for (var i = 0; i < nameValues.Length / 2; i++)
+                {
+                    var key = nameValues[i * 2].ToString();
+                    if (key == null) continue;
+                    var value = nameValues[i * 2 + 1];
+                    sendMap[key] = value;
+                }
+                objectType = sendMap.TryGetValue("objectType", out var value1) ? value1.ToString() ?? "" : "";
+
+                // encrypted?
+                var payload = Mapper.WriteValueAsString(sendMap);
+                if (useEncryption)
+                {
+                    encryptionKey = Sha512.GenerateSha512Hash(
+                        _aes ?? "",
+                        SharedSecrets.GetRandomGuid(_aes ?? "", seed).ToString()
+                        );
+                    var encryptedBody = AesEncryption.Encrypt(payload, encryptionKey);
+                    if (Verbose)
+                        Logger.Info($"POST encrypted body {encryptedBody.Length} bytes");
+                    request.Content = new StringContent(encryptedBody, Encoding.UTF8, "application/json");
+                }
+                else
+                {
+                    if (Verbose)
+                        Logger.Info($"POST body {payload.Length} bytes");
+                    request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+                }
+
+                response = client.SendAsync(request).Result; // use async
+                response.EnsureSuccessStatusCode(); // Throws if not success
+                str = response.Content.ReadAsStringAsync().Result;
             }
-            else
+            catch (HttpRequestException ex)
             {
-                if (Verbose)
-                    Logger.Info($"POST body {payload.Length} bytes");
-                request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+                CheckReturnError(url, response, encryptionKey); // Check for specific error message
+                throw new ArgumentException($"could not read POST contents of {url}, (cmd:{objectType}) exception: ({ex.Message})", ex);
+            }
+            catch (Exception ex)
+            {
+                if (!string.IsNullOrEmpty(ex.Message) && ex.Message.Contains("No connection could be made"))
+                {
+                    // can't log - just write to console
+                    Console.WriteLine($"SimSage is not reachable over the network, trying again in {WaitForNetworkErrorTimeoutInSeconds} seconds.");
+                    retry = true;
+                }
+                else
+                {
+                    throw new ArgumentException($"could not read POST contents of {url}, (cmd:{objectType}) exception: ({ex.Message})", ex);
+                }
+            }
+            finally
+            {
+                response?.Dispose();
+                client?.Dispose();
             }
 
-            response = client.SendAsync(request).Result; // use async
-            response.EnsureSuccessStatusCode(); // Throws if not success
-            str = response.Content.ReadAsStringAsync().Result;
-        }
-        catch (HttpRequestException ex)
-        {
-            CheckReturnError(url, response, encryptionKey); // Check for specific error message
-            throw new ArgumentException($"could not read POST contents of {url}, (cmd:{objectType}) exception: ({ex.Message})", ex);
-        }
-        catch (Exception ex)
-        {
-            throw new ArgumentException($"could not read POST contents of {url}, (cmd:{objectType}) exception: ({ex.Message})", ex);
-        }
-        finally
-        {
-            response?.Dispose();
-            client?.Dispose();
-        }
+            // keep trying until the system comes back online
+            if (retry)
+            {
+                Thread.Sleep(WaitForNetworkErrorTimeoutInSeconds * 1000);
+            }
+
+        } while (retry);
 
         if (!string.IsNullOrWhiteSpace(str) && useEncryption)
-        {
-            return AesEncryption.Decrypt(
-                str,
-                Sha512.GenerateSha512Hash(
-                    _aes ?? "", 
-                    SharedSecrets.GetRandomGuid(_aes ?? "", seed).ToString()
-                    )
-            );
-        }
+            {
+                return AesEncryption.Decrypt(
+                    str,
+                    Sha512.GenerateSha512Hash(
+                        _aes ?? "",
+                        SharedSecrets.GetRandomGuid(_aes ?? "", seed).ToString()
+                        )
+                );
+            }
         return str;
     }
 
