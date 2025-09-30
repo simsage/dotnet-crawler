@@ -88,6 +88,20 @@ public class TestInventoryOnly
         ));
     }
 
+    // invalid file type - straight into inventory
+    [Fact]
+    public void TestInventoryOnly7()
+    {
+        var pc = CreatePlatformCrawler(false);
+        Assert.True(pc.IsInventoryOnly(
+            CreateAsset(
+                "https://some.server.com/data.fcs",
+                3024L,
+                "application/vnd.isac.fcs"
+            )
+        ));
+    }
+
     /////////////////////////////////////////////////////////////////////
     
     private PlatformCrawlerCommonProxy CreatePlatformCrawler(bool sourceInventoryFlag)
