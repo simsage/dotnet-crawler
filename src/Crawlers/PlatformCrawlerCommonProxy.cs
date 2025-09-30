@@ -8,7 +8,6 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Diagnostics;
-using NUnit.Framework;
 
 /// <summary>
 /// the main communications bus with the external SimSage system to transfer files and data
@@ -22,12 +21,11 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
     private const string NotLoaded = "source not loaded (null)";
     private const string Base64Prefix = ";base64,";
-    private const string lastModifiedPrefix = "last-modified-";
-    private readonly bool _isWindows = RockUtils.IsWindows();
+    private const string LastModifiedPrefix = "last-modified-";
     private const int CacheLifespanInDays = 365;
     private const int MaxUploadBlockSize = 1024 * 1024 * 10; // 10MB
-    // if SimSage isn't reacable, wait this many seconds
-    public static int WaitForNetworkErrorTimeoutInSeconds = 60;
+    // if SimSage isn't reachable, wait this many seconds
+    public static readonly int WaitForNetworkErrorTimeoutInSeconds = 5;
     public bool Active { get; set; } = true;
 
     private readonly string _simSageEndpoint;
@@ -400,7 +398,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         // has this asset already been sent?
         if (_cacheDao != null)
         {
-            var cachedHash = _cacheDao.Get(lastModifiedPrefix + asset.Url);
+            var cachedHash = _cacheDao.Get(LastModifiedPrefix + asset.Url);
             if (cachedHash == "")
             {
                 return true; // DNE, write it as having changed
@@ -412,7 +410,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
             }
             // set the item's data in the cache, it has changed
             _cacheDao.Set(
-                lastModifiedPrefix + asset.Url,
+                LastModifiedPrefix + asset.Url,
                 asset.LastModified.ToString(),
                 CacheLifespanInDays * 3600_000L * 24L
                 );
@@ -466,7 +464,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                     return true;
                 }
                 // set the item's data in cache for last modified and for content hash
-                _cacheDao.Set(lastModifiedPrefix + externalAsset.Url, externalAsset.LastModified.ToString(), CacheLifespanInDays * 3600_000L * 24L);
+                _cacheDao.Set(LastModifiedPrefix + externalAsset.Url, externalAsset.LastModified.ToString(), CacheLifespanInDays * 3600_000L * 24L);
                 _cacheDao.Set(externalAsset.Url, assetHash, CacheLifespanInDays * 3600_000L * 24L);
             }
 
@@ -943,7 +941,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
             if (tempFile?.Exists == true && totalFileSize > 0 && totalFileSize < maxSizeInBytes)
             {
                 // split the data to send into blocks
-                var totalParts = (int)Math.Ceiling((double)totalFileSize / (double)MaxUploadBlockSize);
+                var totalParts = (int)Math.Ceiling((double)totalFileSize / MaxUploadBlockSize);
                 var buffer = new byte[MaxUploadBlockSize];
                 Logger.Debug($"fileUploadPost(url={file.Url},size={totalFileSize},blocks={totalParts},jobId={jobId})");
                 using var fileStream = new FileStream(filename, FileMode.Open, FileAccess.Read);
@@ -1066,7 +1064,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         HttpClient? client = null;
         var objectType = "";
         var encryptionKey = "";
-        var retry = false;
+        bool retry;
         do
         {
             retry = false; // assume we succeed
@@ -1227,6 +1225,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
 
     // is the given exception a network error?
+    // it is challenging catching these exact - as the exception types are varied
     public static bool IsNetWorkError(Exception ex)
     {
         return !string.IsNullOrEmpty(ex.Message) && (

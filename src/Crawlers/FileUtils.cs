@@ -26,7 +26,7 @@ public static class FileUtils
         {
             return rf.MaxFileSize; // already in bytes
         }
-        return 10L * 1024L * 1024L; // Default
+        return 10L * 1024L * 1024L; // Default max size
     }
 
     

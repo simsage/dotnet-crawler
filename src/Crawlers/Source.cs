@@ -2,7 +2,6 @@ namespace Crawlers;
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json.Serialization;
 
 public class Source : IComparable<Source>
@@ -275,9 +274,6 @@ public class Source : IComparable<Source>
 
     // the name of the refresh token property
     public const string REFRESH_TOKEN = "refreshToken";
-
-    // maximum size is 50MB by default
-    public const long DEFAULT_MAX_SIZE = 50L * 1024L * 1024L;
 
     // Source-types that support delta crawling
     public static readonly HashSet<string> DeltaCrawlerSet =
