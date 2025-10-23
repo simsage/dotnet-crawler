@@ -267,31 +267,29 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     }
 
     /// <summary>
-    /// record an asset exception
+    /// Record an asset exception
     /// </summary>
-    /// <param name="url">the url of the asset/document</param>
-    /// <param name="exception">the exception to record (a string)</param>
-    /// <param name="webUrl">the web URL (a string)</param>
-    /// <param name="folderUrl">the folder this item is located in (if applicable)</param>
-    /// <param name="deltaRootId">the delta for this folder (if applicable)</param>
-    public void RecordExceptionAsset(
-        string url,
-        string exception,
-        string webUrl,
-        string folderUrl,
-        string deltaRootId
+    /// <param name="asset">The asset/document data.</param>
+    /// <param name="errorStr">The error to log.</param>
+    /// <param name="exception">Optional exception information.</param>
+    /// <returns>A string representing the downloaded file path, or an empty string if the file is not downloaded.</returns>
+    public void RecordAssetException(
+        Asset asset, 
+        string errorStr, 
+        Exception? exception
     )
     {
         // check parameters before posting
-        if (string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(_kbId) ||
+        if (string.IsNullOrWhiteSpace(asset.Url) || string.IsNullOrWhiteSpace(_kbId) ||
             string.IsNullOrWhiteSpace(_organisationId) || _sourceId <= 0 || string.IsNullOrWhiteSpace(_sid) || _runId == 0L
         )
         {
-            throw new ArgumentException("invalid parameter(s)");
+            return;
         }
 
         _numFilesSeen += 1;
-        Logger.Debug($"recordExceptionAsset(url={url},exception={exception},webUrl={webUrl})");
+        asset.Metadata.TryGetValue(Document.META_URL, out var webUrl);
+        Logger.Debug($"recordExceptionAsset(url={asset.Url},exception={exception},webUrl={webUrl ?? ""})");
         var seed = _rng.Next();
         var postUrl = !_useEncryption
             ? $"{_simSageEndpoint}/crawler/external/document/recordfailure"
@@ -305,11 +303,11 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                     "kbId", _kbId,
                     "sid", _sid,
                     "sourceId", _sourceId,
-                    "sourceSystemId", url,
-                    "webUrl", webUrl,
-                    "deltaRootId", deltaRootId,
+                    "sourceSystemId", asset.Url,
+                    "webUrl", webUrl ?? "",
+                    "deltaRootId", "",
                     "runId", _runId,
-                    "errorMessage", exception
+                    "errorMessage", $"{errorStr} {exception?.ToString() ?? ""}"
                 ], _useEncryption, seed, _simSageApiVersion, _allowSelfSignedCertificate
             );
             var data = Mapper.ReadValue<Dictionary<string, object>>(jsonStr);
@@ -321,7 +319,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         }
         catch (Exception ex)
         {
-            Logger.Error($"recordExceptionAsset({url}): {ex.Message}", ex);
+            Logger.Error($"recordExceptionAsset({asset.Url}): {ex.Message}", ex);
         }
     }
 

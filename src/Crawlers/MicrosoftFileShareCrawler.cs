@@ -304,17 +304,22 @@ public class MicrosoftFileShareCrawler : ICrawler
                     if (_api.LastModifiedHasChanged(asset))
                     {
                         asset.Filename = DownloadAssetData(asset, metadata);
-                        return _api.ProcessAsset(asset);
+                        if (asset.Filename != "")
+                        {
+                            return _api.ProcessAsset(asset);
+                        }
                     }
                 }
 
             }
-            catch (FileNotFoundException)
+            catch (FileNotFoundException ex)
             {
+                _api?.RecordAssetException(asset, $"File not found: {filePath}", ex);
                 _logger.Error($"{_name}: File not found: {filePath}. It might have been moved or deleted.");
             }
             catch (UnauthorizedAccessException ex)
             {
+                _api?.RecordAssetException(asset, $"Access denied to file {filePath}", ex);
                 _logger.Error($"{_name}: Access denied to file {filePath}: {ex.Message}");
             }
             catch (Exception ex)
@@ -327,6 +332,7 @@ public class MicrosoftFileShareCrawler : ICrawler
                 }
                 else
                 {
+                    _api?.RecordAssetException(asset, $"An unexpected error occurred while processing file {filePath}", ex);
                     _logger.Error($"{_name}: An unexpected error occurred while processing file {filePath}");
                 }
             }
@@ -354,8 +360,9 @@ public class MicrosoftFileShareCrawler : ICrawler
     /// <summary>
     /// Downloads a file from the share to the local download directory.
     /// </summary>
+    /// <param name="asset">The asset holder.</param>
     /// <param name="sourceFilePath">The full path of the file on the share.</param>
-    private string DownloadFile(string sourceFilePath)
+    private string DownloadFile(Asset asset, string sourceFilePath)
     {
         var retry = false;
         do
@@ -369,6 +376,7 @@ public class MicrosoftFileShareCrawler : ICrawler
             }
             catch (UnauthorizedAccessException ex)
             {
+                _api?.RecordAssetException(asset, $"Permission denied to download {sourceFilePath}", ex);
                 _logger.Debug($"{_name}: Permission denied to download {sourceFilePath}: {ex.Message}");
             }
             catch (Exception ex)
@@ -430,13 +438,17 @@ public class MicrosoftFileShareCrawler : ICrawler
     /// <returns>A string representing the downloaded file path, or an empty string if the file is not downloaded.</returns>
     private string DownloadAssetData(Asset asset, FileMetadata item)
     {
-        if (item.FileSize <= 0L) return "";
+        if (item.FileSize <= 0L)
+        {
+            _api?.RecordAssetException(asset, "File empty", null);
+            return "";
+        }
 
         // only download the file if we need to
         if (_api != null && !_api.IsInventoryOnly(asset))
         {
             // Download the file
-            return DownloadFile(item.FilePath);
+            return DownloadFile(asset, item.FilePath);
         }
 
         return "";
