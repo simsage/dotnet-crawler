@@ -6,7 +6,6 @@ using System.Globalization;
 using System.IO;
 using System.Security.AccessControl;
 using System.Security.Principal;
-using NUnit.Framework;
 
 /// <summary>
 /// Microsoft File Share Crawler
@@ -284,8 +283,8 @@ public class MicrosoftFileShareCrawler : ICrawler
             try
             {
                 retry = false;
-                FileInfo fileInfo = new FileInfo(filePath);
-                FileMetadata metadata = new FileMetadata
+                var fileInfo = new FileInfo(filePath);
+                var metadata = new FileMetadata
                 {
                     FilePath = filePath,
                     FileSize = fileInfo.Length,
@@ -426,18 +425,18 @@ public class MicrosoftFileShareCrawler : ICrawler
     /// Downloads asset data for the provided file metadata if specific conditions are met.
     /// and return the local temporary filename for the data (or empty string if we don't download it)
     /// </summary>
+    /// <param name="asset">The document holder / information.</param>
     /// <param name="item">The metadata of the file to be downloaded.</param>
     /// <returns>A string representing the downloaded file path, or an empty string if the file is not downloaded.</returns>
     private string DownloadAssetData(Asset asset, FileMetadata item)
     {
-        if (item.FileSize > 0L)
+        if (item.FileSize <= 0L) return "";
+
+        // only download the file if we need to
+        if (_api != null && !_api.IsInventoryOnly(asset))
         {
-            // only download the file if we need to
-            if (_api != null && !_api.IsInventoryOnly(asset))
-            {
-                // Download the file
-                return DownloadFile(item.FilePath);
-            }
+            // Download the file
+            return DownloadFile(item.FilePath);
         }
 
         return "";
@@ -606,7 +605,7 @@ public class MicrosoftFileShareCrawler : ICrawler
                 if (!string.IsNullOrEmpty(user.Email))
                 {
                     var email = user.Email;
-                    var samAccount = user.SamAccountName ?? "";
+                    var samAccount = user.SamAccountName;
                     if (samAccount.Length > 1)
                     {
                         samAccount = char.ToUpper(samAccount[0]) + samAccount.Substring(1).ToLower();
