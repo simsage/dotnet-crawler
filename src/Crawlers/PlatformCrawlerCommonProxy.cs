@@ -48,9 +48,6 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private long _numFilesSeen;
     private int _numErrors;
 
-    // is the crawler running?
-    private bool _running;
-
     // access to the crawler
     private Source? _source;
     private long _sourceNextRefreshTime;
@@ -639,11 +636,6 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     }
 
     /// <summary>
-    /// This is a proxy platform crawler - it is _never_ ready for platform crawling
-    /// </summary>
-    public bool IsActive() => false;
-
-    /// <summary>
     /// Mark a file as seen - requires asset with full data if present
     /// in order to process archives on the other side of the fence
     /// </summary>
@@ -691,7 +683,6 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     {
         if (_source?.IsExternal == false)
         {
-            _running = false;
             return;
         }
 
@@ -715,7 +706,24 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         _numFilesSeen = 0;
         _numFilesUploaded = 0;
         _numErrors = 0;
-        _running = true;
+    }
+
+
+    /// <summary>
+    ///  @return the relative wait time in milliseconds
+    /// the first return time is the number of milliseconds we have to wait
+    /// </summary>
+    /// <param name="scheduleEnabled">is this source's schedule enabled at all?</param>
+    /// <returns></returns>
+    private long GetWaitTime(bool scheduleEnabled)
+    {
+        if (!scheduleEnabled) // there is no schedule - for a year's wait
+            return 24L * 36_500L * 3_600_000L; // wait for 100 years
+        var waitTimeInHours = CrawlerUtils.CrawlerWaitTimeInHours(
+            CrawlerUtils.GetCurrentTimeIndicatorString(),
+            _source?.Schedule ?? ""
+        );
+        return waitTimeInHours * 3_600_000L; // hours to milliseconds
     }
 
 
@@ -726,35 +734,35 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// <returns><c>true</c> after we're ready to go, false if the crawler needs to stop / exit</returns>
     public bool WaitForStart()
     {
-        if (_source == null) return false;
+        if (_source == null || !Active) return false;
+        var source = _source;
+        if (!source.IsExternal) return false;
 
-        var currentSchedule = _source?.Schedule ?? "";
-        var currentScheduleEnabled = _source?.ScheduleEnable ?? false;
-        var waitTimeInHours = CrawlerUtils.CrawlerWaitTimeInHours(
-            CrawlerUtils.GetCurrentTimeIndicatorString(),
-            _source?.Schedule ?? "",
-            !_running
-        );
-        var waitTimeInMilliseconds = (waitTimeInHours * 3600_000L);
-        if (waitTimeInMilliseconds > 0)
+        var waitTimeInMilliseconds = GetWaitTime(source.ScheduleEnable);
+        if (waitTimeInMilliseconds <= 0) return Active;
+        var prevTime = RockUtils.MilliSecondsDeltaToString(waitTimeInMilliseconds);
+        var waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTimeInMilliseconds;
+        Logger.Info($"{source.Name}: waiting {prevTime} (to start)");
+        while (Active && waitTime > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
         {
-            var prevTime = RockUtils.MilliSecondsDeltaToString(waitTimeInMilliseconds);
-            var waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTimeInMilliseconds;
-            Logger.Info($"{_source?.Name}: waiting {prevTime} as per schedule");
-            while (Active && waitTime > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            // wait 10 seconds before checking the source again
+            for (var i = 0; i < 20; i++)
             {
-                // wait 10 seconds before checking the source again
-                for (var i = 0; i < 10 && Active; i++)
-                {
-                    Thread.Sleep(1_000); // wait 10 seconds before checking again
-                }
-                if (!Active) break;
-                // get any source changes
-                CheckCrawler();
-                if (currentSchedule != (_source?.Schedule ?? ""))
-                    return false; // terminate crawler: schedule changed
-                if (currentScheduleEnabled != (_source?.ScheduleEnable ?? false))
-                    return false; // terminate crawler: schedule enabled status changed
+                Thread.Sleep(500);
+                if (!Active) return false;
+            }
+            // get any source changes
+            CheckCrawler();
+            if (_source == null) return false;
+            source = _source;
+            // update the wait time in case of a change in schedule or a change in schedule-enabled status
+            var w0 = GetWaitTime(source.ScheduleEnable);
+            if (w0 <= 0L)
+            {
+                waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - 1L;
+            } else
+            {
+                waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + w0;
             }
         }
         return Active;
@@ -768,62 +776,42 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// <returns><c>true</c> after we're ready to go, false if the crawler needs to stop / exit</returns>
     private bool WaitUntilCrawlerReady()
     {
-        var currentSchedule = _source?.Schedule ?? "";
-        var waitTimeInHours = CrawlerUtils.CrawlerWaitTimeInHours(
-            CrawlerUtils.GetCurrentTimeIndicatorString(),
-            currentSchedule,
-            !_running
-        );
-        var waitTimeInMilliseconds = (waitTimeInHours * 3600_000L);
-        var waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTimeInMilliseconds;
-        if (waitTimeInHours <= 0) return _running;
-        var prevTime = RockUtils.MilliSecondsDeltaToString(waitTimeInMilliseconds); // pretty print
-        Logger.Info($"{_source?.Name}: waiting {prevTime} as per schedule");
-        while (Active && waitTime > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() && _source is { IsExternal: true })
-        {
-            Thread.Sleep(10_000); // wait 10 seconds before checking again
+        if (_source == null || !Active) return false;
+        var source = _source;
+        if (!source.IsExternal) return false;
 
-            if (!Active) break;
+        var waitTimeInMilliseconds = GetWaitTime(source.ScheduleEnable);
+        if (waitTimeInMilliseconds <= 0) return Active;
+        var prevTime = RockUtils.MilliSecondsDeltaToString(waitTimeInMilliseconds); // pretty print
+        Logger.Info($"{_source?.Name}: waiting {prevTime} (until ready again)");
+        var waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTimeInMilliseconds;
+        while (Active && waitTime > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() && source.IsExternal)
+        {
+            for (var i = 0; i < 20; i++)
+            {
+                Thread.Sleep(500);
+                if (!Active) return false;
+            }
 
             // get any source changes - if false - we need to re-evaluate our status
             CheckCrawler();
+            if (_source == null) return false;
 
-            // if the schedule changes, the crawler is no longer "finished"
-            if (_source?.Schedule != currentSchedule)
+            // update the wait time in case of a change in schedule or a change in schedule-enabled status
+            var w0 = GetWaitTime(source.ScheduleEnable);
+            if (w0 <= 0L)
             {
-                currentSchedule = _source?.Schedule ?? "";
-                if (!_running)
-                    SignalCrawlerStart();
-                _running = true;
-            }
-            // abort if this is no longer an external crawler
-            if (_source?.IsExternal == false)
+                waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - 1L;
+            } else
             {
-                _running = false;
-                return false;
-            }
-            // re-evaluate our wait time - just in case
-            waitTimeInHours = CrawlerUtils.CrawlerWaitTimeInHours(
-                CrawlerUtils.GetCurrentTimeIndicatorString(),
-                _source?.Schedule ?? "",
-                !_running
-            );
-            waitTimeInMilliseconds = (waitTimeInHours * 3600_000L);
-            waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + waitTimeInMilliseconds;
-            var nextTime = RockUtils.MilliSecondsDeltaToString(waitTimeInMilliseconds);
-            if (prevTime != nextTime)
-            {
-                prevTime = nextTime;
-                Logger.Info($"{_source?.Name}: waiting {nextTime} as per schedule");
+                waitTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + w0;
             }
         }
-        return _running;
+        return Active;
     }
 
     public void CrawlerDone()
     {
-        _running = false;
-
         if (_numFilesSeen > 0)
         {
             Logger.Info($"{_source?.Name}, finished runId {_runId}");
@@ -848,7 +836,6 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
 
     public void CrawlerCrashed(string reason)
     {
-        _running = false;
         _numFilesSeen = 0;
         WaitUntilCrawlerReady();
     }

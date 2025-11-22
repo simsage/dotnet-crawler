@@ -125,9 +125,8 @@ public abstract class CrawlerUtils
     /// </summary>
     /// <param name="currentTimeStr">the current time slot we're at</param>
     /// <param name="scheduleTime">the schedule of the source</param>
-    /// <param name="crawlerFinished">whether the crawler was running right now</param>
     /// <returns></returns>
-    public static int CrawlerWaitTimeInHours(string currentTimeStr, string scheduleTime, bool crawlerFinished)
+    public static int CrawlerWaitTimeInHours(string currentTimeStr, string scheduleTime)
     {
         var scheduleSet = GetTimeSlots(scheduleTime);
 
@@ -135,13 +134,8 @@ public abstract class CrawlerUtils
         if (scheduleSet.Count == 0)
             return 24 * 36500;
 
-        // get the current time strings - if we're running 24/7 the next available slot is Sunday after midnight
-        var waitingForSunday = crawlerFinished && scheduleSet.Count == (24 * 7);
-        if (waitingForSunday && currentTimeStr == "sun-00")
-            return 0;
-
         // running in an active slot - if the crawler is active, go for it!
-        if (scheduleSet.Contains(currentTimeStr) && !crawlerFinished)
+        if (scheduleSet.Contains(currentTimeStr))
         {
             return 0;
         }
