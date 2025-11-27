@@ -458,8 +458,10 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                     MarkFileAsSeen(externalAsset);
                     return true;
                 }
+
                 // set the item's data in cache for last modified and for content hash
-                _cacheDao.Set(LastModifiedPrefix + externalAsset.Url, externalAsset.LastModified.ToString(), CacheLifespanInDays * 3600_000L * 24L);
+                _cacheDao.Set(LastModifiedPrefix + externalAsset.Url, externalAsset.LastModified.ToString(),
+                    CacheLifespanInDays * 3600_000L * 24L);
                 _cacheDao.Set(externalAsset.Url, assetHash, CacheLifespanInDays * 3600_000L * 24L);
             }
 

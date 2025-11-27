@@ -303,10 +303,20 @@ public class MicrosoftFileShareCrawler : ICrawler
                 {
                     if (_api.LastModifiedHasChanged(asset))
                     {
-                        asset.Filename = DownloadAssetData(asset, metadata);
-                        if (asset.Filename != "")
+                        try
                         {
-                            return _api.ProcessAsset(asset);
+                            asset.Filename = DownloadAssetData(asset, metadata);
+                            if (asset.Filename != "")
+                            {
+                                return _api.ProcessAsset(asset);
+                            }
+                        }
+                        finally
+                        {
+                            if (asset.Filename != "")
+                            {
+                                File.Delete(asset.Filename);
+                            }
                         }
                     }
                 }
