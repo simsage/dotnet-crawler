@@ -88,27 +88,21 @@ namespace Crawlers;
                     while (crawler.Active)
                     {
                         crawler.Initialize(InternalServiceName, source.GetCrawlerPropertyMap(), platform);
-                        if (platform.CrawlerStart(crawler))
+                        platform.CrawlerStart(crawler);
+                        if (platform.WaitForStart() && crawler.Run())
                         {
-                            if (platform.WaitForStart() && crawler.Run())
-                            {
-                                platform.CrawlerDone();
-                                EventLog.WriteEntry(InternalServiceName, $"{source}: done",
-                                    EventLogEntryType.Information);
-                            }
-                            else
-                            {
-                                platform.CrawlerCrashed("");
-                                EventLog.WriteEntry(InternalServiceName, $"{source}: TERMINATED",
-                                    EventLogEntryType.Error);
-                            }
-
-                            if (startParameters.ExitAfterFinishing)
-                            {
-                                break;
-                            }
+                            platform.CrawlerDone();
+                            EventLog.WriteEntry(InternalServiceName, $"{source}: done", EventLogEntryType.Information);
                         }
-
+                        else
+                        {
+                            platform.CrawlerCrashed("");
+                            EventLog.WriteEntry(InternalServiceName, $"{source}: TERMINATED", EventLogEntryType.Error);
+                        }
+                        if (startParameters.ExitAfterFinishing)
+                        {
+                            break;
+                        }
                         EventLog.WriteEntry(InternalServiceName, $"{source}: waiting five minutes before resuming", EventLogEntryType.Information);
                         var counter = 300; // 300 x 1 seconds = 5 minutes
                         while (crawler.Active && counter > 0)
