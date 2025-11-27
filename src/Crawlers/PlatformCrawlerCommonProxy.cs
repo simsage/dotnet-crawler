@@ -718,20 +718,23 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         var crawler = _source ?? throw new ArgumentException(NotLoaded);
 
         // if we didn't finish previously, we must tell SimSage to finish on a new start
-        if (!DidCrawlFinish())
+        if (crawler.EndTimeCrawler > 0 || crawler.EndTime > 0)
         {
-            // send a finish message
-            Logger.Info($"{crawler}, did not finish previously, finishing now, and retrying later");
-            CrawlerFinished();
-            return false;
+            if (!DidCrawlFinish())
+            {
+                // send a finish message
+                Logger.Info($"{crawler}, did not finish previously, finishing now, and retrying later");
+                CrawlerFinished();
+                return false;
+            }
+
+            if (!HaveAllFilesProcessed())
+            {
+                Logger.Info($"{crawler}, still processing files from previous run, will retry later");
+                return false;
+            }
         }
 
-        if (!HaveAllFilesProcessed())
-        {
-            Logger.Info($"{crawler}, still processing files from previous run, will retry later");
-            return false;
-        }
-        
         if (crawler.IsExternal == false)
         {
             Logger.Info($"{crawler}, is not external, cannot run");

@@ -8,9 +8,9 @@ public class TestInventoryOnly
     [Fact]
     public void TestInventoryOnly1()
     {
-        var pc = CreatePlatformCrawler(false);
+        var pc = Utility.CreatePlatformCrawler(false);
         Assert.True(pc.IsInventoryOnly(
-            CreateAsset(
+            Utility.CreateAsset(
                 "https://some.server.com/data.pdf",
                 1024L,
                 "application/pdf"
@@ -22,9 +22,9 @@ public class TestInventoryOnly
     [Fact]
     public void TestInventoryOnly2()
     {
-        var pc = CreatePlatformCrawler(false);
+        var pc = Utility.CreatePlatformCrawler(false);
         Assert.True(pc.IsInventoryOnly(
-            CreateAsset(
+            Utility.CreateAsset(
                 "https://some.server.com/data.docx",
                 1231234123123123123L,
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -36,9 +36,9 @@ public class TestInventoryOnly
     [Fact]
     public void TestInventoryOnly3()
     {
-        var pc = CreatePlatformCrawler(false);
+        var pc = Utility.CreatePlatformCrawler(false);
         Assert.True(pc.IsInventoryOnly(
-            CreateAsset(
+            Utility.CreateAsset(
                 "https://some.server.com/data.docx",
                 0L,
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -50,9 +50,9 @@ public class TestInventoryOnly
     [Fact]
     public void TestInventoryOnly4()
     {
-        var pc = CreatePlatformCrawler(false);
+        var pc = Utility.CreatePlatformCrawler(false);
         Assert.True(pc.IsInventoryOnly(
-            CreateAsset(
+            Utility.CreateAsset(
                 "https://some.server.com/data",
                 1024L,
                 ""
@@ -64,9 +64,9 @@ public class TestInventoryOnly
     [Fact]
     public void TestInventoryOnly5()
     {
-        var pc = CreatePlatformCrawler(true);
+        var pc = Utility.CreatePlatformCrawler(true);
         Assert.True(pc.IsInventoryOnly(
-            CreateAsset(
+            Utility.CreateAsset(
                 "https://some.server.com/data.docx",
                 1024L,
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -78,9 +78,9 @@ public class TestInventoryOnly
     [Fact]
     public void TestInventoryOnly6()
     {
-        var pc = CreatePlatformCrawler(false);
+        var pc = Utility.CreatePlatformCrawler(false);
         Assert.False(pc.IsInventoryOnly(
-            CreateAsset(
+            Utility.CreateAsset(
                 "https://some.server.com/data.docx",
                 1024L,
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -92,49 +92,15 @@ public class TestInventoryOnly
     [Fact]
     public void TestInventoryOnly7()
     {
-        var pc = CreatePlatformCrawler(false);
+        var pc = Utility.CreatePlatformCrawler(false);
         Assert.True(pc.IsInventoryOnly(
-            CreateAsset(
+            Utility.CreateAsset(
                 "https://some.server.com/data.fcs",
                 3024L,
                 "application/vnd.isac.fcs"
             )
         ));
     }
-
-    /////////////////////////////////////////////////////////////////////
-    
-    private PlatformCrawlerCommonProxy CreatePlatformCrawler(bool sourceInventoryFlag)
-    {
-        var pc = new PlatformCrawlerCommonProxy(
-            "test service",
-            "https://local.com",
-            "1",
-            "FILE",
-            "org-id",
-            "kb-id",
-            "sid",
-            "aes",
-            1,
-            false,
-            true,
-            true,
-            false
-            );
-        var source = new Source();
-        source.InventoryOnlyInclude = sourceInventoryFlag;
-        source.InventoryOnlyMimeTypes = ["application/pdf"];
-        pc.SetSource(source); 
-        return pc;
-    }
-
-    private Asset CreateAsset(string url, long size, string mimeType)
-    {
-        var asset = new Asset();
-        asset.Url = url;
-        asset.BinarySize = size;
-        asset.MimeType = mimeType;
-        return asset;
-    }
+   
     
 }
