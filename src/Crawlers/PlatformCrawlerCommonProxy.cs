@@ -676,20 +676,69 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         }
     }
 
+
+    /// <summary>
+    /// Determines whether the crawling process has finished based on the source's start and end time values.
+    /// </summary>
+    /// <returns>
+    /// Returns true if the source has been initialized, has a valid starting time greater than zero,
+    /// and the end time of the crawler is greater than the start time. Otherwise, returns false.
+    /// </returns>
+    private bool DidCrawlFinish()
+    {
+        return _source != null && _source.StartTime > 0 && _source.StartTime < _source.EndTimeCrawler;
+    }
+
+    /// <summary>
+    /// Determines whether all files have been processed by the crawler.
+    /// </summary>
+    /// <remarks>
+    /// This method verifies that the crawling process has completed by checking if
+    /// the crawling session has finished and if the associated source's
+    /// crawler end time is less than or equal to its overall end time.
+    /// </remarks>
+    /// <returns>
+    /// True if all files have been processed and the source is no longer active; otherwise, false.
+    /// </returns>
+    private bool HaveAllFilesProcessed()
+    {
+        return DidCrawlFinish() && _source != null && _source.EndTimeCrawler <= _source.EndTime;
+    }
+    
+    
     /// <summary>
     /// Start the file crawler running
     /// </summary>
-    public void CrawlerStart(ICrawler platformCrawler)
+    public bool CrawlerStart(ICrawler platformCrawler)
     {
-        if (_source?.IsExternal == false)
+        // get updated source
+        GetSource();
+        var crawler = _source ?? throw new ArgumentException(NotLoaded);
+
+        // if we didn't finish previously, we must tell SimSage to finish on a new start
+        if (!DidCrawlFinish())
         {
-            return;
+            // send a finish message
+            Logger.Info($"{crawler}, did not finish previously, finishing now, and retrying later");
+            CrawlerFinished();
+            return false;
         }
+
+        if (!HaveAllFilesProcessed())
+        {
+            Logger.Info($"{crawler}, still processing files from previous run, will retry later");
+            return false;
+        }
+        
+        if (crawler.IsExternal == false)
+        {
+            Logger.Info($"{crawler}, is not external, cannot run");
+            return false;
+        }
+
 
         // cleanup cache
         _cacheDao?.CleanupExpiredEntries();
-
-        var crawler = _source ?? throw new ArgumentException(NotLoaded);
 
         // check this crawler is a valid external crawler
         if (!crawler.IsExternal)
@@ -706,6 +755,8 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         _numFilesSeen = 0;
         _numFilesUploaded = 0;
         _numErrors = 0;
+
+        return true;
     }
 
 
