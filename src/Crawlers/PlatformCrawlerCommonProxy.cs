@@ -934,7 +934,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     private void CrawlerFinished()
     {
         // finished
-        Logger.Info($"{_source}, has finished run {_runId}");
+        Logger.Info($"{_source}, has finished run");
 
         var seed = _rng.Next();
         var url = !_useEncryption
