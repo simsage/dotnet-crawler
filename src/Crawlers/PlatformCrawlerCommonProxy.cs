@@ -686,9 +686,9 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// Returns true if the source has been initialized, has a valid starting time greater than zero,
     /// and the end time of the crawler is greater than the start time. Otherwise, returns false.
     /// </returns>
-    private bool DidCrawlFinish()
+    public static bool DidCrawlFinish(Source source)
     {
-        return _source != null && _source.StartTime > 0 && _source.StartTime < _source.EndTimeCrawler;
+        return source.StartTime <= 0 || source.StartTime < source.EndTimeCrawler;
     }
 
     /// <summary>
@@ -702,9 +702,9 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
     /// <returns>
     /// True if all files have been processed and the source is no longer active; otherwise, false.
     /// </returns>
-    private bool HaveAllFilesProcessed()
+    public static bool HaveAllFilesProcessed(Source source)
     {
-        return DidCrawlFinish() && _source != null && _source.EndTimeCrawler <= _source.EndTime;
+        return source.StartTime <= 0 || (source.StartTime > 0 && source.EndTimeCrawler <= source.EndTime);
     }
     
     
@@ -720,7 +720,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         // if we didn't finish previously, we must tell SimSage to finish on a new start
         if (crawler.EndTimeCrawler > 0 || crawler.EndTime > 0)
         {
-            if (!DidCrawlFinish())
+            if (!DidCrawlFinish(_source))
             {
                 // send a finish message
                 Logger.Info($"{crawler}, did not finish previously, finishing now, and retrying later");
@@ -728,7 +728,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                 return false;
             }
 
-            if (!HaveAllFilesProcessed())
+            if (!HaveAllFilesProcessed(_source))
             {
                 Logger.Info($"{crawler}, still processing files from previous run, will retry later");
                 return false;
