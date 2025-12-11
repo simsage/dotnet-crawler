@@ -9,17 +9,17 @@ public class Document
     {
         // is it just a base URL?
         var colonIndex = url.IndexOf("://");
+        var url2 = url;
         if (colonIndex >= 0)
         {
             // no next slash after? doesn't have a file-extension
             if (url.IndexOf('/', colonIndex + 3) < 0)
                 return "";
+            // Assuming Source.removeQueryString and Source.removeHashFromUrl are implemented elsewhere.
+            // For demonstration, let's provide a basic implementation or assume they exist.
+            // If they are not available, you'll need to implement them or use existing .NET URL parsing.
+            url2 = RemoveQueryString(RemoveHashFromUrl(url)).Trim();
         }
-
-        // Assuming Source.removeQueryString and Source.removeHashFromUrl are implemented elsewhere.
-        // For demonstration, let's provide a basic implementation or assume they exist.
-        // If they are not available, you'll need to implement them or use existing .NET URL parsing.
-        var url2 = RemoveQueryString(RemoveHashFromUrl(url)).Trim();
 
         var index = url2.LastIndexOf('.');
         var index2 = url2.LastIndexOf('/');
@@ -33,8 +33,9 @@ public class Document
         {
             return url2.Substring(index + 1).ToLowerInvariant().Trim();
         }
-
-        return url.Length <= 5 ? url.ToLowerInvariant().Trim() : "";
+        if (url.IndexOf("/") < 0 && url.IndexOf("\\") < 0)
+            return url.ToLowerInvariant().Trim();
+        return "";
     }
 
     //region Helper Methods (to mimic Kotlin's Source.removeQueryString and Source.removeHashFromUrl)

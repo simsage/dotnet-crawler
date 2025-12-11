@@ -32,5 +32,11 @@ public class TestDocument
         Assert.Equal("html", Document.GetFileExtension("\"https://dataset.simsage.co.uk/index.html?parameter=1.1&last=html#a1.1\""));
     }
     
+    [Fact]
+    public void TestDocumentFileExtension6()
+    {
+        Assert.Equal("docx", Document.GetFileExtension("\\\\192.168.2.17\\share1\\rock-test\\BOT NET CRAWLER-01994c70-e359-cfc3-683b-2e17aae79ecc-TEST-1985eed-fc75-Oam8Q~HHRvy~FYim.oyNUZPq16onjeD_bece-632c-2425efafdb6eDocument!@#$_&+_)(&^_$123456-7890,}{][`~c276f883-e0c8-43ae-9119-df8b7df9c574-test.docx"));
+    }
+    
 }
 
