@@ -126,8 +126,8 @@ public class StartParameters
         Console.WriteLine("    -sid eb1d0e94-bd2d-7b3d-8fe7-01df99d72ce1     # required: the security ID");
         Console.WriteLine("    -crawler file                                 # required: the type of the Source, must be \"file\"");
         Console.WriteLine("    -source 1                                     # required: the source ID");
-        Console.WriteLine("    -aes 313939                                   # optional: AES decryption string");
-        Console.WriteLine("    -encryption                                   # optional: use message encryption");
+        Console.WriteLine("    -aes 313939                                   # optional: AES decryption string (only needed of -encryption is used)");
+        Console.WriteLine("    -encryption                                   # optional: use message encryption (requires -aes to be used)");
         Console.WriteLine("    -noselfsigned                                 # optional: don't allow self-signed certificates");
         Console.WriteLine("    -exitwhendone                                 # optional: exit the crawler when done");
         Console.WriteLine("    -disablecache                                 # optional: do not use the sqlite asset cache");
