@@ -1160,7 +1160,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                 if (IsNetWorkError(ex))
                 {
                     // can't log - just write to console
-                    Console.WriteLine($"SimSage is not reachable over the network, trying again in {WaitForNetworkErrorTimeoutInSeconds} seconds.");
+                    Console.WriteLine($"SimSage is not reachable over the network, trying again in {WaitForNetworkErrorTimeoutInSeconds} seconds. ERROR: {ex.Message}");
                     retry = true;
                 }
                 else
@@ -1273,6 +1273,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
                     ex.Message.Contains("No connection could be made") ||
                     ex.Message.Contains("network location cannot be reached") ||
                     ex.Message.Contains("unreachable network") ||
+                    ex.Message.Contains("No such host is known") ||
                     ex.Message.Contains("error code 1231") // network cannot be reached
                 );
     }
