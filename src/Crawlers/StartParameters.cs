@@ -120,7 +120,7 @@ public class StartParameters
     private static void WriteParameters()
     {
         Console.WriteLine("parameters:");
-        Console.WriteLine("    -server https://test7.simsage.ai/api          # required: the SimSage server to communicate with");
+        Console.WriteLine("    -server https://test1.simsage.ai/api          # required: the SimSage server to communicate with");
         Console.WriteLine("    -org 0197e48f-be19-541f-59d5-fe44613836a8     # required: the organisation ID");
         Console.WriteLine("    -kb 0197e490-5781-bab6-5347-279d6704eec4      # required: the knowledge-base ID");
         Console.WriteLine("    -sid eb1d0e94-bd2d-7b3d-8fe7-01df99d72ce1     # required: the security ID");
@@ -128,8 +128,8 @@ public class StartParameters
         Console.WriteLine("    -source 1                                     # required: the source ID");
         Console.WriteLine("    -aes 313939                                   # optional: AES decryption string (only needed of -encryption is used)");
         Console.WriteLine("    -encryption                                   # optional: use message encryption (requires -aes to be used)");
-        Console.WriteLine("    -noselfsigned                                 # optional: don't allow self-signed certificates");
-        Console.WriteLine("    -exitwhendone                                 # optional: exit the crawler when done");
+        Console.WriteLine("    -noselfsigned                                 # optional: don't allow self-signed certificates (default allowed)");
+        Console.WriteLine("    -exitwhendone                                 # optional: exit the crawler when done (default wait and run again)");
         Console.WriteLine("    -disablecache                                 # optional: do not use the sqlite asset cache");
     }
     
