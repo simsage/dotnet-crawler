@@ -105,9 +105,7 @@ public class PlatformCrawlerCommonProxy : ICrawlerApi, IExternalSourceLogger
         if (!useCache) return;
         _cacheDao = new SqliteAssetDao(serviceName);
         _cacheDao.Initialize();
-#pragma warning disable CA1416
-        EventLog.WriteEntry(serviceName, $"Using crawler_cache.db: {_cacheDao.CacheDatabasePath}", EventLogEntryType.Information);
-#pragma warning restore CA1416
+        Logger.Info($"Using crawler_cache.db: {_cacheDao.CacheDatabasePath}");
     }
 
     /// <summary>

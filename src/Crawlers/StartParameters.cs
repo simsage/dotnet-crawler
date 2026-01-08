@@ -14,7 +14,7 @@ public class StartParameters
     public string Sid { get; private set; } = "";
     public string Aes { get; private set; } = "";
     public int SourceId { get; private set; } = -1;
-    public bool UseEncryption { get; private set; }
+    public bool UseEncryption { get; set; } = false;
     public bool ExitAfterFinishing { get; private set; }
     public bool AllowSelfSignedCertificate { get; private set; } = true;
     public bool UseCache { get; private set; } = true;
