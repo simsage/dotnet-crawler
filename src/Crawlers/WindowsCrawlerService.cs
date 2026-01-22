@@ -29,10 +29,6 @@ namespace Crawlers;
                 InternalServiceName = ServiceName;
             }
 
-            // Log that the service is starting
-            var singleStringSpace = string.Join(" ", args);
-            EventLog.WriteEntry(InternalServiceName, $"Service is starting, parameters: {singleStringSpace}", EventLogEntryType.Information);
-
             // Parse command line arguments
             if (args is { Length: >= 12 })
             {
@@ -40,9 +36,13 @@ namespace Crawlers;
                 if (!startParameters.ProcessParameters(args))
                 {
                     var errStr3 = "Bad Starting Parameters";
-                    EventLog.WriteEntry(InternalServiceName, errStr3, EventLogEntryType.Error);
+                    WriteMessage(false, InternalServiceName, errStr3, EventLogEntryType.Error);
                     throw new InvalidOperationException(errStr3);
                 }
+
+                // Log that the service is starting
+                var singleStringSpace = string.Join(" ", args);
+                WriteMessage(startParameters.UseEventLog, InternalServiceName, $"Service is starting, parameters: {singleStringSpace}", EventLogEntryType.Information);
 
                 // set AES key?
                 if (startParameters.Aes.Length > 0)
@@ -70,16 +70,16 @@ namespace Crawlers;
                 if (!source.IsExternal)
                 {
                     var errStr1 = $"Source {source.Name} (id {source.SourceId}) is not an external Source";
-                    EventLog.WriteEntry(InternalServiceName, errStr1, EventLogEntryType.Error);
+                    WriteMessage(startParameters.UseEventLog, InternalServiceName, errStr1, EventLogEntryType.Error);
                     throw new InvalidOperationException(errStr1);
                 }
                 if (source.CrawlerType != Source.CT_FILE)
                 {
                     var errStr2 = $"Source {source.Name} (id {source.SourceId}) is not a Microsoft File Crawler";
-                    EventLog.WriteEntry(InternalServiceName, errStr2, EventLogEntryType.Error);
+                    WriteMessage(startParameters.UseEventLog, InternalServiceName, errStr2, EventLogEntryType.Error);
                     throw new InvalidOperationException(errStr2);
                 }
-                EventLog.WriteEntry(InternalServiceName, $"{source}: starting new {source.CrawlerType} external-crawler", EventLogEntryType.Information);
+                WriteMessage(startParameters.UseEventLog, InternalServiceName, $"{source}: starting new {source.CrawlerType} external-crawler", EventLogEntryType.Information);
 
                 // run this thing threaded
                 Task.Run(() =>
@@ -93,14 +93,12 @@ namespace Crawlers;
                             if (platform.WaitForStart() && crawler.Run())
                             {
                                 platform.CrawlerDone();
-                                EventLog.WriteEntry(InternalServiceName, $"{source}: done",
-                                    EventLogEntryType.Information);
+                                WriteMessage(startParameters.UseEventLog, InternalServiceName, $"{source}: done", EventLogEntryType.Information);
                             }
                             else
                             {
                                 platform.CrawlerCrashed("");
-                                EventLog.WriteEntry(InternalServiceName, $"{source}: TERMINATED",
-                                    EventLogEntryType.Error);
+                                WriteMessage(startParameters.UseEventLog, InternalServiceName, $"{source}: TERMINATED", EventLogEntryType.Error);
                             }
                         }
 
@@ -109,7 +107,9 @@ namespace Crawlers;
                             break;
                         }
 
-                        EventLog.WriteEntry(InternalServiceName, $"{source}: waiting five minutes before resuming", EventLogEntryType.Information);
+                        WriteMessage(startParameters.UseEventLog, InternalServiceName, $"{source}: TERMINATED", EventLogEntryType.Error);
+
+                        WriteMessage(startParameters.UseEventLog, InternalServiceName, $"{source}: waiting five minutes before resuming", EventLogEntryType.Information);
                         var counter = 300; // 300 x 1 seconds = 5 minutes
                         while (crawler.Active && counter > 0)
                         {
@@ -123,14 +123,14 @@ namespace Crawlers;
             else
             {
                 var errStr4 = "Bad Starting Parameters (no parameters)";
-                EventLog.WriteEntry(InternalServiceName, errStr4, EventLogEntryType.Error);
+                WriteMessage(false, InternalServiceName, errStr4, EventLogEntryType.Error);
                 throw new InvalidOperationException(errStr4);
             }
         }
 
         protected override void OnStop()
         {
-            EventLog.WriteEntry(InternalServiceName, "Service is stopping.", EventLogEntryType.Information);
+            WriteMessage(false, InternalServiceName, "Service is stopping.", EventLogEntryType.Information);
             crawler.Active = false;
             if (platform != null)
                 platform.Active = false;
@@ -138,10 +138,23 @@ namespace Crawlers;
         
         protected override void OnShutdown()
         {
-            EventLog.WriteEntry(InternalServiceName, "Service is shutting down.", EventLogEntryType.Information);
+            WriteMessage(false, InternalServiceName, "Service is shutting down.", EventLogEntryType.Information);
             crawler.Active = false;
             if (platform != null)
                 platform.Active = false;
+        }
+
+
+        private void WriteMessage(bool useEventLog, string internalServiceName, string message, EventLogEntryType logType)
+        {
+            if (useEventLog)
+            {
+                EventLog.WriteEntry(internalServiceName, message, logType);
+            }
+            else
+            {
+                System.Console.WriteLine($"{internalServiceName}: {logType} - {message}");
+            }
         }
         
     }

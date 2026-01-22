@@ -18,6 +18,7 @@ public class StartParameters
     public bool ExitAfterFinishing { get; private set; }
     public bool AllowSelfSignedCertificate { get; private set; } = true;
     public bool UseCache { get; private set; } = true;
+    public bool UseEventLog { get; private set; } = false;
 
     /// <summary>
     /// read parameters from args[]
@@ -75,6 +76,10 @@ public class StartParameters
             {
                 SourceType = args[i + 1];
                 i += 1;
+            }
+            else if (args[i] == "-eventlog")
+            {
+                UseEventLog = true;
             }
             else if (args[i] == "-encryption")
             {
