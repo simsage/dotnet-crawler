@@ -49,6 +49,12 @@ cd src/Crawlers/bin/Release/net8.0/
 # to run see run from console below
 ```
 
+## Cache file location
+The default cache file location on Windows is `C:\ProgramData\Console\` for running the crawler from the command line, and
+`C:\ProgramData\{service-name}\` for running this program as a service.  You can delete these cache files any time after
+the program has stopped running.  This ProgramData folder is probably invisible or mapped on most Windows versions, just
+navigate to this folder by typing the path into explorer.
+
 ## run
 This code has been designed to run as a Windows-Service or as a command-line utility.
 
