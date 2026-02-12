@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildProjectDirectory)=C:\Source</PathMap>
   </PropertyGroup>
 
   <ItemGroup>
