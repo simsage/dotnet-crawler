@@ -12,12 +12,15 @@ using System.Linq;
 
         public SqliteAssetDao(string serviceName)
         {
-            // Define your cache database file path
+            // Define your cache database file path - set by unit tests only
             if (string.IsNullOrEmpty(CacheDatabasePath))
             {
+                // this path is C:\ProgramData\<service_name>\crawler_cache.db
                 var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
                 var serviceDataPath = Path.Combine(appDataPath, serviceName);
-                Directory.CreateDirectory(serviceDataPath); // Ensure directory exists
+                if (!Directory.Exists(serviceDataPath)) {
+                    Directory.CreateDirectory(serviceDataPath); // Ensure directory exists
+                }
                 CacheDatabasePath = Path.Combine(serviceDataPath, "crawler_cache.db");
             }
             DbContext = new CachedAssetDbContext(CacheDatabasePath);
