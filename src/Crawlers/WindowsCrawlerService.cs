@@ -107,8 +107,6 @@ namespace Crawlers;
                             break;
                         }
 
-                        WriteMessage(startParameters.UseEventLog, InternalServiceName, $"{source}: TERMINATED", EventLogEntryType.Error);
-
                         WriteMessage(startParameters.UseEventLog, InternalServiceName, $"{source}: waiting five minutes before resuming", EventLogEntryType.Information);
                         var counter = 300; // 300 x 1 seconds = 5 minutes
                         while (crawler.Active && counter > 0)
