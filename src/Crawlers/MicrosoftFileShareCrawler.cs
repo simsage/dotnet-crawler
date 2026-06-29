@@ -64,6 +64,11 @@ public class MicrosoftFileShareCrawler : ICrawler
             var (users, groups) = SetupAdUsersAndGroups(parameters);
             _adUsers = users;
             _adGroups = groups;
+            if (parameters.UseAd && users.Count == 0)
+            {
+                _logger.Error($"{_name}: No users found in AD");
+                return false;
+            }
         }
         catch
         {
