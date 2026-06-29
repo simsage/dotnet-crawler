@@ -12,177 +12,210 @@ public class LdapReader
 {
     private static readonly RockLogger Logger = RockLogger.GetLogger(typeof(LdapReader));
 
-    private readonly string _adPath;
-    private readonly bool _useSSL;
+    private readonly string[] _adPathArray;
+    private readonly bool _useSsl;
     private readonly string _username;
     private readonly string _password;
 
     /// <summary>
+    /// Represents a container for users and groups retrieved from an LDAP directory.
+    /// </summary>
+    public class UserAndGroups(List<LdapUser> users, List<LdapGroup> groups)
+    {
+        public readonly List<LdapUser> UserList = users;
+        public readonly List<LdapGroup> GroupList = groups;
+    }
+    
+    /// <summary>
     /// Initializes a new instance of the LdapReader class.
     /// </summary>
-    /// <param name="adPath">The LDAP path (e.g., "DC=yourdomain,DC=com").</param>
+    /// <param name="adPathArray">The LDAP path array (e.g., ["CN=Users,DC=yourdomain,DC=com", "OU=Contractors,CN=Users,DC=yourdomain,DC=com"]).</param>
+    /// <param name="useSsl">A flag indicating whether to use SSL (true) or not (false).</param>
     /// <param name="username">The username for binding to LDAP (e.g., "yourdomain\\username" or "username@yourdomain.com").</param>
     /// <param name="password">The password for the specified username.</param>
-    public LdapReader(string adPath, bool useSSL, string username, string password)
+    public LdapReader(string[] adPathArray, bool useSsl, string username, string password)
     {
-        _adPath = adPath;
-        _useSSL = useSSL;
+        _adPathArray = adPathArray;
+        _useSsl = useSsl;
         _username = username;
         _password = password;
     }
 
     /// <summary>
-    /// Fetches all users from the LDAP directory.
+    /// Fetches all users and groups from the LDAP directory.
     /// </summary>
-    /// <returns>A list of LdapUser objects.</returns>
-    public List<LdapUser> GetAllUsers()
+    /// <returns>A collection of LdapUser and LdapGroup objects.</returns>
+    public UserAndGroups GetUsersAndGroups()
     {
         List<LdapUser> users = new List<LdapUser>();
-        string ldapPath = _useSSL ? $"LDAPS://CN=Users,{_adPath}" : $"LDAP://CN=Users,{_adPath}";
-        try
+        List<LdapGroup> groups = new List<LdapGroup>();
+        foreach (string adPath in _adPathArray)
         {
-            using (DirectoryEntry entry = new DirectoryEntry(ldapPath, _username, _password))
+            string ldapPath = _useSsl ? $"LDAPS://{adPath.Trim()}" : $"LDAP://{adPath.Trim()}";
+            try
             {
-                using (DirectorySearcher searcher = new DirectorySearcher(entry))
+                using var entry = new DirectoryEntry(ldapPath, _username, _password);
+                users.AddRange(FindUsers(entry, adPath));
+                groups.AddRange(FindGroups(entry, adPath));
+            }
+            catch (DirectoryServicesCOMException ex)
+            {
+                Logger.Error($"LDAP Error fetching users, ignoring {adPath}: {ex.Message}");
+                if (ex.ExtendedErrorMessage != null)
                 {
-                    searcher.Filter = "(&(objectClass=user)(objectCategory=person))";
-                    // Load only necessary properties to improve performance
-                    searcher.PropertiesToLoad.Add("distinguishedName");
-                    searcher.PropertiesToLoad.Add("sAMAccountName");
-                    searcher.PropertiesToLoad.Add("objectSid");
-                    searcher.PropertiesToLoad.Add("displayName");
-                    searcher.PropertiesToLoad.Add("mail");
-                    searcher.PropertiesToLoad.Add("givenName");
-                    searcher.PropertiesToLoad.Add("sn");
-                    searcher.PropertiesToLoad.Add("memberOf"); // Direct group memberships
-
-                    searcher.PageSize = 1000; // Optimize for large results
-
-                    Logger.Info("Searching for users...");
-                    using (SearchResultCollection results = searcher.FindAll())
-                    {
-                        foreach (SearchResult result in results)
-                        {
-                            var sid = new SecurityIdentifier((byte[])result.Properties["objectSid"][0], 0);
-                            var ntAccount = (NTAccount)sid.Translate(typeof(NTAccount));
-
-                            LdapUser user = new LdapUser
-                            {
-                                DistinguishedName = GetProperty(result, "distinguishedName"),
-                                SamAccountName = GetProperty(result, "sAMAccountName"),
-                                DisplayName = GetProperty(result, "displayName"),
-                                Email = GetProperty(result, "mail"),
-                                FirstName = GetProperty(result, "givenName"),
-                                LastName = GetProperty(result, "sn"),
-                                Identity = ntAccount.Value.ToLower()
-                            };
-
-                            if (user.Email != "" && user.Identity != "")
-                            {
-                                // Get direct group memberships (returns DNs)
-                                if (result.Properties.Contains("memberOf"))
-                                {
-                                    foreach (string groupDn in result.Properties["memberOf"])
-                                    {
-                                        user.MemberOfGroups.Add(groupDn);
-                                    }
-                                }
-                                users.Add(user);
-                            }
-                        }
-                    }
+                    Logger.Error($"Extended Error: {ex.ExtendedErrorMessage}");
                 }
             }
-            Logger.Info($"Found {users.Count} users with email addresses and identities.");
+            catch (Exception ex2)
+            {
+                Logger.Error($"An unexpected error occurred while fetching users, ignoring {adPath}: {ex2.Message}");
+            }
+        }
+        Logger.Info($"Found {users.Count} users with email addresses and identities, and {groups.Count} groups.");
+        return new UserAndGroups(users, groups);
+    }
+
+
+    /// <summary>
+    /// Searches for users in the specified LDAP path and retrieves their attributes.
+    /// </summary>
+    /// <param name="entry">The DirectoryEntry object used for querying the LDAP directory.</param>
+    /// <param name="adPath">The LDAP path used to scope the user search.</param>
+    /// <returns>A list of LdapUser objects representing the users found in the specified LDAP path.</returns>
+    private List<LdapUser> FindUsers(DirectoryEntry entry, string adPath)
+    {
+        Logger.Info($"Searching for users in {adPath}");
+        List<LdapUser> users = new List<LdapUser>();
+        try
+        {
+            using var searcher = new DirectorySearcher(entry);
+            searcher.Filter = "(&(objectClass=user)(objectCategory=person))";
+            // Load only necessary properties to improve performance
+            searcher.PropertiesToLoad.Add("distinguishedName");
+            searcher.PropertiesToLoad.Add("sAMAccountName");
+            searcher.PropertiesToLoad.Add("objectSid");
+            searcher.PropertiesToLoad.Add("displayName");
+            searcher.PropertiesToLoad.Add("mail");
+            searcher.PropertiesToLoad.Add("givenName");
+            searcher.PropertiesToLoad.Add("sn");
+            searcher.PropertiesToLoad.Add("memberOf"); // Direct group memberships
+
+            searcher.PageSize = 1000; // Optimize for large results
+
+            using var results = searcher.FindAll();
+            foreach (SearchResult result in results)
+            {
+                var sid = new SecurityIdentifier((byte[])result.Properties["objectSid"][0], 0);
+                var ntAccount = (NTAccount)sid.Translate(typeof(NTAccount));
+
+                LdapUser user = new LdapUser
+                {
+                    DistinguishedName = GetProperty(result, "distinguishedName"),
+                    SamAccountName = GetProperty(result, "sAMAccountName"),
+                    DisplayName = GetProperty(result, "displayName"),
+                    Email = GetProperty(result, "mail"),
+                    FirstName = GetProperty(result, "givenName"),
+                    LastName = GetProperty(result, "sn"),
+                    Identity = ntAccount.Value.ToLower()
+                };
+
+                if (user.Email != "" && user.Identity != "")
+                {
+                    // Get direct group memberships (returns DNs)
+                    if (result.Properties.Contains("memberOf"))
+                    {
+                        foreach (string groupDn in result.Properties["memberOf"])
+                        {
+                            user.MemberOfGroups.Add(groupDn);
+                        }
+                    }
+
+                    users.Add(user);
+                }
+            }
         }
         catch (DirectoryServicesCOMException ex)
         {
-            Logger.Error($"LDAP Error fetching users: {ex.Message}");
+            Logger.Error($"LDAP Error fetching users, ignoring {adPath}: {ex.Message}");
             if (ex.ExtendedErrorMessage != null)
             {
                 Logger.Error($"Extended Error: {ex.ExtendedErrorMessage}");
             }
-            throw;
         }
         catch (Exception ex2)
         {
-            Logger.Error($"An unexpected error occurred while fetching users: {ex2.Message} (bad AD path {ldapPath})");
-            throw;
+            Logger.Error($"An unexpected error occurred while fetching users, ignoring {adPath}: {ex2.Message}");
         }
+        Logger.Info($"Found {users.Count} users in {adPath}");
         return users;
     }
 
+
     /// <summary>
-    /// Fetches all groups from the LDAP directory.
+    /// Retrieves a list of LDAP groups from the specified directory entry and Active Directory path.
     /// </summary>
-    /// <returns>A list of LdapGroup objects.</returns>
-    public List<LdapGroup> GetAllGroups()
+    /// <param name="entry">The <see cref="DirectoryEntry"/> object representing the LDAP directory entry to search.</param>
+    /// <param name="adPath">The Active Directory path used to perform the search.</param>
+    /// <returns>A list of <see cref="LdapGroup"/> objects representing the groups found in the directory.</returns>
+    private List<LdapGroup> FindGroups(DirectoryEntry entry, string adPath)
     {
+        Logger.Info($"Searching for groups in {adPath}");
         List<LdapGroup> groups = new List<LdapGroup>();
-        string ldapPath = _useSSL ? $"LDAPS://CN=Users,{_adPath}" : $"LDAP://CN=Users,{_adPath}";
         try
         {
-            using (DirectoryEntry entry = new DirectoryEntry(ldapPath, _username, _password))
+            using var searcher = new DirectorySearcher(entry);
+            searcher.Filter = "(objectClass=group)";
+            searcher.PropertiesToLoad.Add("distinguishedName");
+            searcher.PropertiesToLoad.Add("sAMAccountName");
+            searcher.PropertiesToLoad.Add("displayName");
+            searcher.PropertiesToLoad.Add("objectSid");
+            searcher.PropertiesToLoad.Add("member"); // Direct members (users or other groups)
+
+            searcher.PageSize = 1000; // Optimize for large results
+
+            Logger.Info("Searching for groups...");
+            using var results = searcher.FindAll();
+            foreach (SearchResult result in results)
             {
-                using (DirectorySearcher searcher = new DirectorySearcher(entry))
+                var sid = new SecurityIdentifier((byte[])result.Properties["objectSid"][0], 0);
+                var ntAccount = (NTAccount)sid.Translate(typeof(NTAccount));
+
+                LdapGroup group = new LdapGroup
                 {
-                    searcher.Filter = "(objectClass=group)";
-                    searcher.PropertiesToLoad.Add("distinguishedName");
-                    searcher.PropertiesToLoad.Add("sAMAccountName");
-                    searcher.PropertiesToLoad.Add("displayName");
-                    searcher.PropertiesToLoad.Add("objectSid");
-                    searcher.PropertiesToLoad.Add("member"); // Direct members (users or other groups)
+                    DistinguishedName = GetProperty(result, "distinguishedName"),
+                    SamAccountName = GetProperty(result, "sAMAccountName"),
+                    DisplayName = GetProperty(result, "displayName"),
+                    Identity = ntAccount.Value.ToLower()
+                };
 
-                    searcher.PageSize = 1000; // Optimize for large results
-
-                    Logger.Info("Searching for groups...");
-                    using (SearchResultCollection results = searcher.FindAll())
+                // Get direct members (returns DNs)
+                if (result.Properties.Contains("member"))
+                {
+                    foreach (string memberDn in result.Properties["member"])
                     {
-                        foreach (SearchResult result in results)
-                        {
-                            var sid = new SecurityIdentifier((byte[])result.Properties["objectSid"][0], 0);
-                            var ntAccount = (NTAccount)sid.Translate(typeof(NTAccount));
-
-                            LdapGroup group = new LdapGroup
-                            {
-                                DistinguishedName = GetProperty(result, "distinguishedName"),
-                                SamAccountName = GetProperty(result, "sAMAccountName"),
-                                DisplayName = GetProperty(result, "displayName"),
-                                Identity = ntAccount.Value.ToLower()
-                            };
-
-                            // Get direct members (returns DNs)
-                            if (result.Properties.Contains("member"))
-                            {
-                                foreach (string memberDn in result.Properties["member"])
-                                {
-                                    group.Members.Add(memberDn);
-                                }
-                            }
-                            if (group.Identity != "")
-                            {
-                                groups.Add(group);
-                            }
-                        }
+                        group.Members.Add(memberDn);
                     }
                 }
+
+                if (group.Identity != "")
+                {
+                    groups.Add(group);
+                }
             }
-            Logger.Info($"Found {groups.Count} groups.");
         }
         catch (DirectoryServicesCOMException ex)
         {
-            Logger.Error($"LDAP Error fetching groups: {ex.Message}");
+            Logger.Error($"LDAP Error fetching groups, ignoring {adPath}: {ex.Message}");
             if (ex.ExtendedErrorMessage != null)
             {
                 Logger.Error($"Extended Error: {ex.ExtendedErrorMessage}");
             }
-            throw;
         }
         catch (Exception ex2)
         {
-            Logger.Error($"An unexpected error occurred while fetching users: {ex2.Message} (bad AD path {ldapPath})");
-            throw;
+            Logger.Error($"An unexpected error occurred while fetching groups, ignoring {adPath}: {ex2.Message}");
         }
+        Logger.Info($"Found {groups.Count} groups in {adPath}");
         return groups;
     }
 

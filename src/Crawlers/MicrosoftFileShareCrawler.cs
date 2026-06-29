@@ -173,15 +173,16 @@ public class MicrosoftFileShareCrawler : ICrawler
             _logger.Info($"{_name}: Connecting to active directories...");
             try
             {
-                var reader = new LdapReader(parameters.AdPath, parameters.UseSsl, parameters.Username, parameters.Password);
+                var reader = new LdapReader(parameters.AdPath.Split('|'), parameters.UseSsl, parameters.Username, parameters.Password);
                 var groupUserResolver = new Dictionary<string, LdapUser>();
                 var groupGroupResolver = new Dictionary<string, LdapGroup>();
-                foreach (var user in reader.GetAllUsers())
+                var usersAndGroups = reader.GetUsersAndGroups();
+                foreach (var user in usersAndGroups.UserList)
                 {
                     adUser[user.Identity.ToLower()] = user;
                     groupUserResolver[user.DistinguishedName.ToLower()] = user;
                 }
-                foreach (var group in reader.GetAllGroups())
+                foreach (var group in usersAndGroups.GroupList)
                 {
                     adGroups[group.Identity.ToLower()] = group;
                     groupGroupResolver[group.DistinguishedName.ToLower()] = group;
